@@ -6,8 +6,9 @@
 import DesignSystem
 import SwiftUI
 
-/// Launch splash: a walker strides in, crouches to grab a rescue bag,
-/// and heads off with it swinging before the app appears.
+/// Launch splash: a walker strides up to a café doorway, crouches to take the
+/// rescue bag waiting on the threshold, and heads off with it in hand before
+/// the app appears.
 struct SplashView: View {
     var onFinished: () -> Void = {}
 
@@ -113,6 +114,7 @@ struct WalkScene {
         let bagX = size.width * 0.58
 
         drawGround(in: &ctx, width: size.width, y: groundY)
+        drawShop(in: &ctx, doorX: bagX, groundY: groundY)
 
         // The crouch decides where the walker stops and how tall the bag is,
         // so the hand lands exactly on the handle.
@@ -178,6 +180,67 @@ struct WalkScene {
         line.addLine(to: CGPoint(x: width / 2 * (1 + p), y: y + 6))
         ctx.stroke(line, with: .color(Color.shellCream.opacity(0.9)),
                    style: StrokeStyle(lineWidth: 4, lineCap: .round))
+    }
+
+    /// The café the bag waits at: a facade with a lit doorway, windows, a striped
+    /// awning and a leaf sign, with the bag's threshold step in the doorway.
+    private func drawShop(in ctx: inout GraphicsContext, doorX: CGFloat, groundY: CGFloat) {
+        let reveal = Self.easeOut(time / 0.5)
+        let glow = Self.smooth((time - 0.2) / 0.6)
+        let cream = Color.shellCream
+        let door = CGRect(x: doorX - 26, y: groundY - 112, width: 52, height: 112)
+        let facade = CGRect(x: doorX - 80, y: groundY - 150, width: 160, height: 150)
+
+        var shop = ctx
+        shop.opacity = reveal
+        shop.translateBy(x: 0, y: (1 - reveal) * 12)
+
+        let wall = Path(roundedRect: facade, cornerRadius: 6)
+        shop.fill(wall, with: .color(cream.opacity(0.1)))
+        shop.stroke(wall, with: .color(cream.opacity(0.45)), lineWidth: 2.5)
+
+        for dx: CGFloat in [-55, 55] {
+            let window = Path(roundedRect: CGRect(x: doorX + dx - 16, y: groundY - 90, width: 32, height: 36),
+                              cornerRadius: 3)
+            shop.fill(window, with: .color(cream.opacity(0.1 + 0.15 * glow)))
+            shop.stroke(window, with: .color(cream.opacity(0.45)), lineWidth: 2)
+        }
+
+        // Doorway, warming up as the lights come on inside.
+        shop.fill(Path(door), with: .linearGradient(
+            Gradient(colors: [cream.opacity(0.12 + 0.4 * glow), cream.opacity(0.06 + 0.18 * glow)]),
+            startPoint: CGPoint(x: door.midX, y: door.minY),
+            endPoint: CGPoint(x: door.midX, y: door.maxY)))
+        var frame = Path()
+        frame.addLines([CGPoint(x: door.minX, y: door.maxY), CGPoint(x: door.minX, y: door.minY),
+                        CGPoint(x: door.maxX, y: door.minY), CGPoint(x: door.maxX, y: door.maxY)])
+        shop.stroke(frame, with: .color(cream), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+
+        // Striped awning with a scalloped edge.
+        let stripes = 6
+        let awning = CGRect(x: door.minX - 14, y: door.minY - 18, width: door.width + 28, height: 12)
+        let stripeWidth = awning.width / CGFloat(stripes)
+        for i in 0..<stripes {
+            let color = i.isMultiple(of: 2) ? Color.yolk : cream
+            let x = awning.minX + CGFloat(i) * stripeWidth
+            shop.fill(Path(CGRect(x: x, y: awning.minY, width: stripeWidth, height: awning.height)), with: .color(color))
+            shop.fill(Path(ellipseIn: CGRect(x: x, y: awning.maxY - stripeWidth / 2, width: stripeWidth, height: stripeWidth)),
+                      with: .color(color))
+        }
+
+        // Leaf sign above the awning.
+        let sign = CGRect(x: doorX - 18, y: facade.minY + 6, width: 36, height: 16)
+        shop.fill(Path(roundedRect: sign, cornerRadius: 4), with: .color(cream))
+        if let leaf = shop.resolveSymbol(id: Self.leafSymbol) {
+            var small = shop
+            small.translateBy(x: sign.midX, y: sign.midY)
+            small.scaleBy(x: 0.8, y: 0.8)
+            small.draw(leaf, at: .zero)
+        }
+
+        // Threshold step the bag waits on.
+        shop.fill(Path(roundedRect: CGRect(x: door.minX - 8, y: groundY - 1, width: door.width + 16, height: 6),
+                       cornerRadius: 2), with: .color(cream))
     }
 
     /// `anchor` is the top of the handle; the bag hangs below it, rotated by `swing` degrees.
