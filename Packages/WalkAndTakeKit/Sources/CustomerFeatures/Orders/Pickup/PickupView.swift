@@ -124,13 +124,24 @@ struct PickupView<RateSheet: View>: View {
                 .tint(.splashTeal)
                 .accessibilityIdentifier("pickup.startWalk")
             }
-        case .walking(let title, let detail, let warning):
+        case .walking(let walking):
             VStack(alignment: .leading, spacing: 6) {
-                Label(title, systemImage: "figure.walk.motion")
+                Label(walking.title, systemImage: "figure.walk.motion")
                     .font(.headline)
                     .foregroundStyle(Color.splashTeal)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
-                if let warning {
+                if let fraction = walking.fraction {
+                    ProgressView(value: fraction)
+                        .tint(Color.splashTeal)
+                        .accessibilityHidden(true)
+                }
+                Text(walking.progressText)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("pickup.walkProgress")
+                if let counting = walking.countingText {
+                    Text(counting).font(.footnote.weight(.semibold)).foregroundStyle(Color.splashTeal)
+                }
+                Text(walking.detail).font(.subheadline).foregroundStyle(.secondary)
+                if let warning = walking.warning {
                     Label(warning, systemImage: "location.slash.fill")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.orange)

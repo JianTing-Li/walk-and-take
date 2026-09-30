@@ -101,4 +101,19 @@ enum WalkCopy {
             ? "at \(time)" : "on \(TimeText.shortDate(startOpensAt, calendar: calendar)) at \(time)"
         return "Walk to count your miles: Start walk opens \(when) on this order. Tap it, \(steps)"
     }
+
+    // MARK: Live progress
+
+    /// "0.3 mi walked · 0.2 mi to go", or "You've arrived" once at the door.
+    static func progressText(_ progress: WalkProgress) -> String {
+        let arrived = progress.milesToGo * 1609.344 <= WalkVerifier.endRadiusMiles * 1609.344
+        let walked = "\(miles(progress.creditedMiles, places: 2)) mi walked"
+        return arrived
+            ? "\(walked) · You're at the door" : "\(walked) · \(miles(progress.milesToGo, places: 2)) mi to go"
+    }
+
+    /// "Counting +0.30 mi so far" once some of the walk counts.
+    static func countingText(_ progress: WalkProgress) -> String? {
+        progress.creditedMiles > 0 ? "Counting +\(miles(progress.creditedMiles, places: 2)) mi so far" : nil
+    }
 }

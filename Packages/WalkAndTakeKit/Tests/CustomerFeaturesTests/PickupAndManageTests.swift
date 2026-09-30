@@ -193,13 +193,13 @@ struct PickupWalkingTests {
         #expect(harness.walkTracker.isTracking(reservation.id))
         #expect(harness.walkTracker.destination(of: reservation.id) == Self.door)
         #expect(!model.canStartWalk)
-        guard case .walking(let title, let detail, let warning)? = model.walkSection else {
+        guard case .walking(let walking)? = model.walkSection else {
             Issue.record("expected a walking section, got \(String(describing: model.walkSection))")
             return
         }
-        #expect(title == "Walk in progress")
-        #expect(detail == "Started at 7:00 AM. Swipe to confirm pickup when you arrive.")
-        #expect(warning == nil)
+        #expect(walking.title == "Walk in progress")
+        #expect(walking.detail == "Started at 7:00 AM. Swipe to confirm pickup when you arrive.")
+        #expect(walking.warning == nil)
         #expect(try await harness.walkRewards.walk(reservationID: reservation.id) != nil)
     }
 
@@ -207,11 +207,11 @@ struct PickupWalkingTests {
         let (model, harness, _) = await pickup(at: Fixture.sep(24, 7))
         harness.walkTracker.setLocationOff(true)
         await model.startWalk()
-        guard case .walking(_, _, let warning)? = model.walkSection else {
+        guard case .walking(let walking)? = model.walkSection else {
             Issue.record("expected a walking section")
             return
         }
-        #expect(warning?.contains("Location is off") == true)
+        #expect(walking.warning?.contains("Location is off") == true)
     }
 
     @Test func aWalkTheAppLostStartsRecordingAgain() async throws {
@@ -234,6 +234,64 @@ struct PickupWalkingTests {
         await model.load()
         #expect(!harness.walkTracker.isTracking(reservation.id))
         #expect(model.trackingStatus == .idle)
+    }
+
+    // MARK: Live progress
+
+    func walkingContent(_ model: PickupModel) -> PickupModel.WalkSection.Walking? {
+        if case .walking(let walking)? = model.walkSection { return walking }
+        return nil
+    }
+
+    @Test func noProgressBeforeTheWalkStarts() async {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 7))
+        #expect(model.liveProgress == nil)
+    }
+
+    @Test func progressShowsMilesWalkedAndMilesToGo() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkTracker.script(Array(Self.track().prefix(3)))  // a third of the way
+        await model.startWalk()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.progressText == "0.10 mi walked · 0.20 mi to go")
+        #expect(walking.countingText == "Counting +0.10 mi so far")
+        #expect(abs((walking.fraction ?? 0) - 1.0 / 3) < 0.02)
+    }
+
+    @Test func progressAdvancesAsFixesArrive() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkTracker.script(Array(Self.track().prefix(3)))
+        await model.startWalk()
+        harness.walkTracker.script(Array(Self.track().prefix(5)))
+        await model.refreshLiveProgress()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.progressText == "0.20 mi walked · 0.10 mi to go")
+    }
+
+    @Test func arrivingSaysYouAreAtTheDoor() async throws {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 8))
+        await model.startWalk()  // the full track ends at the door
+        let walking = try #require(walkingContent(model))
+        #expect(walking.progressText == "0.30 mi walked · You're at the door")
+        #expect((walking.fraction ?? 0) > 0.99)
+    }
+
+    @Test func waitsForAFirstLocation() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkTracker.script([])
+        await model.startWalk()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.progressText == "Waiting for your first location…")
+        #expect(walking.fraction == nil)
+        #expect(walking.countingText == nil)
+    }
+
+    @Test func progressClearsOnceThePickupIsConfirmed() async {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 8))
+        await model.startWalk()
+        #expect(model.liveProgress != nil)
+        await model.collect()
+        #expect(model.liveProgress == nil)
     }
 
     // MARK: Completing

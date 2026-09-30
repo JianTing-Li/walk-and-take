@@ -14,20 +14,31 @@
 
     actor SimulatedWalkTracker: WalkTracking {
         private var destinations: [UUID: Coordinate] = [:]
+        private var startedAt: [UUID: Date] = [:]
+        /// How long the stand-in walk takes to reach the door, so progress can be watched live.
+        private let demoDuration: TimeInterval = 24
 
         func begin(reservationID: UUID, destination: Coordinate) {
             destinations[reservationID] = destination
+            startedAt[reservationID] = .now
         }
 
         func status(reservationID: UUID) -> WalkTrackingStatus {
             destinations[reservationID] == nil ? .idle : .tracking
         }
 
+        /// The part of the walk "recorded" so far: it advances about every two seconds.
         func samples(reservationID: UUID) -> [WalkSample] {
-            destinations[reservationID].map(Self.track(to:)) ?? []
+            guard let destination = destinations[reservationID], let begun = startedAt[reservationID] else { return [] }
+            let track = Self.track(to: destination)
+            let share = min(1, Date.now.timeIntervalSince(begun) / demoDuration)
+            let count = max(0, min(track.count, Int((Double(track.count) * share).rounded(.down)) + 1))
+            return Array(track.prefix(count))
         }
 
+        /// Stopping records the whole walk, as if the customer had arrived.
         func finish(reservationID: UUID) -> [WalkSample] {
+            startedAt[reservationID] = nil
             guard let destination = destinations.removeValue(forKey: reservationID) else { return [] }
             return Self.track(to: destination)
         }

@@ -106,3 +106,19 @@ public struct Reward: Identifiable, Hashable, Codable, Sendable {
 
     public var isAvailable: Bool { redeemedAt == nil }
 }
+
+/// How a walk is going, from the fixes recorded so far.
+public struct WalkProgress: Hashable, Sendable {
+    /// Miles that would be credited right now: fast segments dropped, capped at the detour and per-pickup limits.
+    public var creditedMiles: Double
+    /// Straight-line miles from the latest fix to the restaurant.
+    public var milesToGo: Double
+    /// How far along the trip is, from 0 (where the walk began) to 1 (at the door).
+    public var fraction: Double
+
+    public init(creditedMiles: Double, milesToGo: Double, fraction: Double) {
+        self.creditedMiles = creditedMiles
+        self.milesToGo = milesToGo
+        self.fraction = fraction
+    }
+}

@@ -216,3 +216,59 @@ struct WalkVerifierTests {
         #expect(WalkVerdict.credited(miles: 0.5).creditedMiles == 0.5)
     }
 }
+
+@Suite("WalkVerifier progress")
+struct WalkProgressTests {
+    let destination = Fixtures.licCenter
+    let start = Fixtures.date(7, 0)
+    let milesPerDegree = 3958.8 * .pi / 180
+
+    func point(milesSouth: Double) -> Coordinate {
+        Coordinate(latitude: destination.latitude - milesSouth / milesPerDegree, longitude: destination.longitude)
+    }
+
+    /// A walk at 3 mph from 0.8 mi south, with only the first `steps` of 8 recorded.
+    func partialWalk(steps: Int, mph: Double = 3, accuracy: Double = 5) -> [WalkSample] {
+        let total = 8
+        let seconds = 0.8 / mph * 3600 / Double(total)
+        return (0...steps).map { i in
+            WalkSample(
+                coordinate: point(milesSouth: 0.8 * (1 - Double(i) / Double(total))),
+                timestamp: start.addingTimeInterval(seconds * Double(i)), horizontalAccuracyMeters: accuracy)
+        }
+    }
+
+    @Test func noProgressUntilThereAreTwoUsableFixes() {
+        #expect(WalkVerifier.progress(samples: [], destination: destination) == nil)
+        #expect(WalkVerifier.progress(samples: partialWalk(steps: 0), destination: destination) == nil)
+        #expect(WalkVerifier.progress(samples: partialWalk(steps: 4, accuracy: 200), destination: destination) == nil)
+    }
+
+    @Test func halfwayThereIsHalfDone() throws {
+        let progress = try #require(WalkVerifier.progress(samples: partialWalk(steps: 4), destination: destination))
+        #expect(abs(progress.creditedMiles - 0.4) < 0.02)
+        #expect(abs(progress.milesToGo - 0.4) < 0.02)
+        #expect(abs(progress.fraction - 0.5) < 0.02)
+    }
+
+    @Test func arrivingReachesOne() throws {
+        let progress = try #require(WalkVerifier.progress(samples: partialWalk(steps: 8), destination: destination))
+        #expect(progress.fraction > 0.99)
+        #expect(progress.milesToGo < 0.01)
+    }
+
+    @Test func fastSegmentsDoNotCountTowardCredit() throws {
+        // Driving pace: the distance moves along the route but earns nothing.
+        let progress = try #require(
+            WalkVerifier.progress(samples: partialWalk(steps: 4, mph: 25), destination: destination))
+        #expect(progress.creditedMiles == 0)
+        #expect(progress.fraction > 0.4)
+    }
+
+    @Test func creditSoFarMatchesWhatVerifyWouldCredit() throws {
+        let samples = partialWalk(steps: 8)
+        let progress = try #require(WalkVerifier.progress(samples: samples, destination: destination))
+        #expect(
+            WalkVerifier.verify(samples: samples, destination: destination) == .credited(miles: progress.creditedMiles))
+    }
+}
