@@ -21,10 +21,12 @@ public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
     public let totalText: String
     /// "50% off one bag: −$2.75", or nil when no reward was used.
     public let rewardText: String?
+    /// Why the pickup must be walked to earn miles, and when Start walk opens. Nil when walking rewards are off.
+    public let walkReminderText: String?
     /// "Free changes and cancellation until 9:50 AM. …", or nil when changes are off.
     public let policyText: String
 
-    init(reservation: Reservation, now: Date, showsChangePolicy: Bool) {
+    init(reservation: Reservation, now: Date, showsChangePolicy: Bool, showsWalkReminder: Bool = false) {
         let snapshot = reservation.snapshot
         let calendar = NYCalendar.calendar
         id = reservation.id
@@ -38,6 +40,11 @@ public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
         rewardText =
             reservation.rewardID == nil
             ? nil : "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"
+        walkReminderText =
+            showsWalkReminder
+            ? WalkCopy.confirmationReminder(
+                startOpensAt: WalkPolicy.startOpensAt(for: reservation), now: now, calendar: calendar)
+            : nil
         let findIt = "Find this order anytime in the Orders tab."
         if showsChangePolicy {
             let deadline = TimeText.time(ReservationPolicy.changeDeadline(for: reservation), calendar: calendar)

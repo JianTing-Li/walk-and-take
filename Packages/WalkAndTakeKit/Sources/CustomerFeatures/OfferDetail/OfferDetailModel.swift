@@ -197,6 +197,11 @@ public final class OfferDetailModel {
             "\(WalkCopy.walkTitle(forDistance: distance)) · +\(WalkCopy.miles(WalkCopy.earnedMiles(forDistance: distance))) mi toward a reward"
     }
 
+    /// Above the Reserve button: miles only count for a walked pickup. Shown while the bag can be reserved.
+    public var walkReminderLine: String? {
+        flags.walkRewards && canReserve ? WalkCopy.reserveReminder : nil
+    }
+
     /// "50% off one bag: −$3.00" while the reward is switched on.
     public var rewardLine: String? {
         reserve.useReward && reserve.showsRewardToggle

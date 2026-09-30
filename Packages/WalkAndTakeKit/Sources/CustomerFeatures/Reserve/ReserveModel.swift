@@ -115,7 +115,8 @@ public final class ReserveModel {
             quantity = 1
             useReward = false
             confirmation = ReservationConfirmation(
-                reservation: reservation, now: now, showsChangePolicy: dependencies.flags.manageOrder)
+                reservation: reservation, now: now, showsChangePolicy: dependencies.flags.manageOrder,
+                showsWalkReminder: dependencies.flags.walkRewards)
         } catch let error as ReservationError {
             alert = error == .notVisibleYet ? .notOpenYet : .noLongerAvailable
         } catch {

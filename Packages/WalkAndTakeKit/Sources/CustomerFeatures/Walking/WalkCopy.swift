@@ -7,6 +7,7 @@
 
 import Domain
 import Foundation
+import Platform
 
 enum WalkCopy {
     /// "0.7"
@@ -81,5 +82,23 @@ enum WalkCopy {
         guard crossed > 0 else { return nil }
         let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
         return crossed == 1 ? "Unlocks a reward: \(discount)" : "Unlocks \(crossed) rewards: \(discount) each"
+    }
+
+    // MARK: Reminders
+
+    /// Reserve bar: miles only count for walkers who start the walk in the app.
+    static let reserveReminder = "Miles count only if you walk to pickup and tap Start walk on your order."
+
+    /// Confirmation sheet: when Start walk opens, and that driving or riding earns nothing.
+    static func confirmationReminder(startOpensAt: Date, now: Date, calendar: Calendar) -> String {
+        let steps = "then swipe to confirm when you arrive. Driving or riding earns no miles."
+        guard startOpensAt > now else {
+            return "Walk to count your miles: tap Start walk on this order, \(steps)"
+        }
+        let time = TimeText.time(startOpensAt, calendar: calendar)
+        let when =
+            calendar.isDate(startOpensAt, inSameDayAs: now)
+            ? "at \(time)" : "on \(TimeText.shortDate(startOpensAt, calendar: calendar)) at \(time)"
+        return "Walk to count your miles: Start walk opens \(when) on this order. Tap it, \(steps)"
     }
 }

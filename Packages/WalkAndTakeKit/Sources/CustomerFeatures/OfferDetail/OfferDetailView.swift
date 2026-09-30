@@ -146,6 +146,13 @@ public struct OfferDetailView: View {
                     .foregroundStyle(Color.splashTeal)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            if let reminder = model.walkReminderLine {
+                Text(reminder)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("offerDetail.walkReminder")
+            }
             if model.canReserve, reserve.showsRewardToggle {
                 Toggle(isOn: Bindable(reserve).useReward) {
                     VStack(alignment: .leading, spacing: 2) {

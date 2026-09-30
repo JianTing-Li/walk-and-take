@@ -40,6 +40,16 @@ struct ReservationConfirmationView: View {
                 .padding(.vertical, Spacing.m).padding(.horizontal, Spacing.xxl)
                 .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
 
+                if let reminder = confirmation.walkReminderText {
+                    Label(reminder, systemImage: "figure.walk")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.splashTeal)
+                        .padding(Spacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
+                        .accessibilityIdentifier("confirmation.walkReminder")
+                }
+
                 Text(confirmation.policyText)
                     .multilineTextAlignment(.center)
                     .font(.footnote)

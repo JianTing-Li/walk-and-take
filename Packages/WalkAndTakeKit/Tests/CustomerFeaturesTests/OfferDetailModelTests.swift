@@ -306,4 +306,39 @@ struct OfferDetailModelTests {
         let card = try #require(await detail().model.walkCard)
         #expect(card.outcome == "After this pickup: 0.2 of 1 mi · 0.8 mi to go")
     }
+
+    // MARK: Walk-to-qualify reminder
+
+    @Test func theReserveBarRemindsYouThatMilesNeedAWalk() async {
+        let model = await detail().model
+        #expect(model.walkReminderLine == "Miles count only if you walk to pickup and tap Start walk on your order.")
+    }
+
+    @Test func noReminderWhenTheBagCannotBeReservedOrTheFlagIsOff() async {
+        #expect(await detail(flags: Fixture.flags(walkRewards: false)).model.walkReminderLine == nil)
+        // 10:30 is after the 10:00 window, so the bag can't be reserved.
+        #expect(await detail(Self.todayID, at: Fixture.sep(24, 10, 30)).model.walkReminderLine == nil)
+    }
+
+    @Test func theConfirmationExplainsWhenStartWalkOpens() async throws {
+        // At 8:00 the window (7:30) is already open, so Start walk is open now.
+        let open = await detail().model.reserve
+        await open.reserve()
+        let openText = try #require(open.confirmation?.walkReminderText)
+        #expect(openText.hasPrefix("Walk to count your miles: tap Start walk on this order, then swipe to confirm"))
+        #expect(openText.hasSuffix("Driving or riding earns no miles."))
+
+        // Reserving tomorrow's bag at 8:30 PM: Start walk opens tomorrow at 6:30 AM.
+        let later = await detail(Self.tomorrowID, at: Fixture.sep(24, 20, 30)).model.reserve
+        await later.reserve()
+        let laterText = try #require(later.confirmation?.walkReminderText)
+        #expect(
+            laterText.hasPrefix("Walk to count your miles: Start walk opens on Fri Sep 25 at 6:30 AM on this order."))
+    }
+
+    @Test func noConfirmationReminderWhenTheFlagIsOff() async {
+        let reserve = await detail(flags: Fixture.flags(walkRewards: false)).model.reserve
+        await reserve.reserve()
+        #expect(reserve.confirmation?.walkReminderText == nil)
+    }
 }
