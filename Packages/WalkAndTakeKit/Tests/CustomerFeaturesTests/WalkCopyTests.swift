@@ -70,4 +70,10 @@ struct WalkCopyTests {
         #expect(WalkCopy.milestone(15) == "15")
         #expect(WalkCopy.milestone(2.5) == "2.5")
     }
+
+    @Test func walkTitleAddsTheEstimatedTime() {
+        #expect(WalkCopy.walkTitleWithTime(forDistance: 1.0) == "1.0 mi walk · about 15 min")
+        #expect(WalkCopy.walkTitleWithTime(forDistance: 0.5) == "0.5 mi walk · about 8 min")
+        #expect(WalkCopy.walkTitleWithTime(forDistance: 0.04) == "0.0 mi walk · about 1 min")
+    }
 }

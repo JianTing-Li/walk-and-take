@@ -177,7 +177,7 @@ struct OfferDetailModelTests {
 
     @Test func detailShowsTheWalkAndItsReward() async throws {
         let card = try #require(await detail().model.walkCard)
-        #expect(card.title == "0.2 mi walk")
+        #expect(card.title == "0.2 mi walk · about 4 min")
         #expect(card.detail == "Earns +0.2 mi toward your next reward")
         #expect(card.footnote == nil)
     }
@@ -190,7 +190,7 @@ struct OfferDetailModelTests {
             dependencies: harness.dependencies, navigation: CustomerNavigation())
         await model.load()
         let card = try #require(model.walkCard)
-        #expect(card.title == "2.1 mi walk")
+        #expect(card.title == "2.1 mi walk · about 31 min")
         #expect(card.detail == "Earns +2.0 mi toward your next reward")
         #expect(card.footnote == "One pickup can add up to 2.0 mi.")
     }

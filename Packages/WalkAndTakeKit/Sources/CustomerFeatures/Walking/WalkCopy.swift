@@ -36,6 +36,11 @@ enum WalkCopy {
         "\(miles(distance)) mi walk"
     }
 
+    /// "0.7 mi walk · about 11 min" (15 minutes per mile).
+    static func walkTitleWithTime(forDistance distance: Double) -> String {
+        "\(walkTitle(forDistance: distance)) · about \(WalkEstimate.minutes(forMiles: distance)) min"
+    }
+
     /// "Earns +0.7 mi toward your next reward"
     static func earnsText(forDistance distance: Double) -> String {
         "Earns +\(miles(earnedMiles(forDistance: distance))) mi toward your next reward"

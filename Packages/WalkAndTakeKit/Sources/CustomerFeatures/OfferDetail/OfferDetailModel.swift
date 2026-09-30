@@ -183,7 +183,7 @@ public final class OfferDetailModel {
     public var walkCard: WalkRewardCard.Content? {
         guard flags.walkRewards, let distance = walkDistance else { return nil }
         return WalkRewardCard.Content(
-            title: WalkCopy.walkTitle(forDistance: distance),
+            title: WalkCopy.walkTitleWithTime(forDistance: distance),
             detail: WalkCopy.earnsText(forDistance: distance),
             footnote: WalkCopy.capNote(forDistance: distance),
             outcome: WalkCopy.outcomeText(currentMiles: walkMiles, distance: distance),
