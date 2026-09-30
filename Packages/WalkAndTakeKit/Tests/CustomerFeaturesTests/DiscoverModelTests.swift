@@ -233,4 +233,29 @@ struct DiscoverModelTests {
         await model.resolveLocation()
         #expect(model.sections.flatMap(\.items).allSatisfy { $0.card.walkRewardText == nil })
     }
+
+    // MARK: Comparing walks
+
+    @Test func cardsCompareWalksWithTheNearestReservableBag() async {
+        let (model, _) = await loaded(at: Fixture.sep(24, 8))
+        let cards = Dictionary(
+            uniqueKeysWithValues: model.sections.flatMap(\.items).map { ($0.offerID.prefix { $0 != "-" }, $0.card) })
+        #expect(cards["breakfast"]?.walkCompareText == "Nearest bag")
+        #expect(cards["lunch"]?.walkCompareText == "0.4 mi farther than the nearest · earns 0.4 mi more")
+        #expect(cards["bakery"]?.walkCompareText == nil)  // sold out
+    }
+
+    @Test func noComparisonWithOnlyOneBagToChooseFrom() async {
+        let (model, _) = await loaded(at: Fixture.sep(24, 8))
+        model.category = .breakfast  // only today's breakfast is reservable now
+        #expect(model.sections.flatMap(\.items).allSatisfy { $0.card.walkCompareText == nil })
+    }
+
+    @Test func comparisonFollowsTheFlag() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: Self.offers, flags: Fixture.flags(walkRewards: false))
+        let model = DiscoverModel(dependencies: harness.dependencies)
+        await model.load()
+        await model.resolveLocation()
+        #expect(model.sections.flatMap(\.items).allSatisfy { $0.card.walkCompareText == nil })
+    }
 }

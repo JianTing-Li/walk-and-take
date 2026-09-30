@@ -27,6 +27,14 @@ enum PreviewSamples {
         walkRewardText: "+0.2 mi toward a reward"
     )
 
+    static let bagCardFarther: BagCard.Content = {
+        var content = bagCard
+        content.distanceText = "0.9 mi away"
+        content.walkRewardText = "+0.9 mi toward a reward"
+        content.walkCompareText = "0.7 mi farther than the nearest · earns 0.7 mi more"
+        return content
+    }()
+
     static let bagCardUrgent: BagCard.Content = {
         var content = bagCard
         content.restaurantName = "Knead Street Bakery"
@@ -81,6 +89,14 @@ enum PreviewSamples {
     static let walkCard = WalkRewardCard.Content(
         title: "0.7 mi walk",
         detail: "Earns +0.7 mi toward your next reward",
-        footnote: "Walk to the pickup to count your miles."
+        footnote: "Walk to the pickup to count your miles.",
+        outcome: "After this pickup: 1.9 of 5 mi · 3.1 mi to go"
+    )
+
+    static let walkCardUnlock = WalkRewardCard.Content(
+        title: "0.9 mi walk",
+        detail: "Earns +0.9 mi toward your next reward",
+        outcome: "After this pickup: 5.1 mi walked",
+        unlock: "Unlocks a reward: 50% off one bag"
     )
 }

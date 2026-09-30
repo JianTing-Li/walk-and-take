@@ -23,6 +23,8 @@ public final class OfferDetailModel {
 
     private(set) var offer: Offer?
     private(set) var restaurant: Restaurant?
+    /// Lifetime walked miles, for the "after this pickup" line.
+    private(set) var walkMiles = 0.0
     private var now: Date
     private let offerID: String
     private let origin: ResolvedLocation
@@ -56,7 +58,12 @@ public final class OfferDetailModel {
         let clockChanges = dependencies.clock.changes()
         let walkChanges = dependencies.walkRewards.changes()
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { for await _ in walkChanges { await self.reserve.refreshRewards() } }
+            group.addTask {
+                for await _ in walkChanges {
+                    await self.loadWalkMiles()
+                    await self.reserve.refreshRewards()
+                }
+            }
             group.addTask { for await _ in offers { await self.load() } }
             group.addTask { for await _ in userData { await self.load() } }
             group.addTask { for await _ in clockChanges { await self.load() } }
@@ -82,11 +89,17 @@ public final class OfferDetailModel {
             self.restaurant = restaurant
             isFavorite = try await dependencies.favorites.favorites().contains { $0.restaurantID == restaurant.id }
             reserve.update(quantityLeft: offer.quantityLeft, unitPrice: offer.price)
+            await loadWalkMiles()
             await reserve.refreshRewards()
             state = .loaded
         } catch {
             if state == .loading { state = .failed("Couldn't load this bag. Please try again.") }
         }
+    }
+
+    private func loadWalkMiles() async {
+        guard flags.walkRewards else { return }
+        walkMiles = (try? await dependencies.walkRewards.totalMiles()) ?? walkMiles
     }
 
     // MARK: - Actions
@@ -172,7 +185,9 @@ public final class OfferDetailModel {
         return WalkRewardCard.Content(
             title: WalkCopy.walkTitle(forDistance: distance),
             detail: WalkCopy.earnsText(forDistance: distance),
-            footnote: WalkCopy.capNote(forDistance: distance))
+            footnote: WalkCopy.capNote(forDistance: distance),
+            outcome: WalkCopy.outcomeText(currentMiles: walkMiles, distance: distance),
+            unlock: WalkCopy.unlockText(currentMiles: walkMiles, distance: distance))
     }
 
     /// Review line above the Reserve button: "0.7 mi walk · +0.7 mi toward a reward".

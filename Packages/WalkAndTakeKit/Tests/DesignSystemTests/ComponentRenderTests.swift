@@ -25,11 +25,13 @@ struct ComponentRenderTests {
 
     static let components: [(String, AnyView)] = [
         ("BagCard", AnyView(BagCard(PreviewSamples.bagCard, isFavorite: true) {})),
+        ("BagCardFarther", AnyView(BagCard(PreviewSamples.bagCardFarther) {})),
         ("BagCardSoldOut", AnyView(BagCard(PreviewSamples.bagCardSoldOut))),
         ("BagCardTomorrow", AnyView(BagCard(PreviewSamples.bagCardTomorrow) {})),
         ("MapBagCard", AnyView(MapBagCard(PreviewSamples.mapCard, onView: {}, onClose: {}))),
         ("WalkRewardPill", AnyView(WalkRewardPill("+0.7 mi toward a reward"))),
         ("WalkRewardCard", AnyView(WalkRewardCard(PreviewSamples.walkCard))),
+        ("WalkRewardCardUnlock", AnyView(WalkRewardCard(PreviewSamples.walkCardUnlock))),
         ("WalkProgressCard", AnyView(WalkProgressCard(PreviewSamples.walkProgress))),
         ("WalkProgressCardNew", AnyView(WalkProgressCard(PreviewSamples.walkProgressNew))),
         ("StatusBadge", AnyView(StatusBadge(text: "Ends in 12 min", isUrgent: true))),

@@ -45,4 +45,41 @@ enum WalkCopy {
             ? "One pickup can add up to \(miles(WalkRewardLadder.maxMilesPerPickup)) mi."
             : nil
     }
+
+    /// How an offer compares with the nearest reservable one, by walking distance.
+    /// "Nearest bag", or "0.4 mi farther than the nearest · earns 0.4 mi more". Distances are compared as shown
+    /// (rounded to a tenth) so the line always agrees with the "0.5 mi away" text.
+    static func compareText(distance: Double, nearest: Double) -> String? {
+        let shown = (distance * 10).rounded() / 10
+        let base = (nearest * 10).rounded() / 10
+        let farther = shown - base
+        guard farther > 0.05 else { return "Nearest bag" }
+        // Earned miles come from the same rounded distances, so "farther" and "earns more" agree.
+        let extra = ((earnedMiles(forDistance: shown) - earnedMiles(forDistance: base)) * 10).rounded() / 10
+        var text = "\(miles(farther)) mi farther than the nearest"
+        if extra > 0.05 { text += " · earns \(miles(extra)) mi more" }
+        return text
+    }
+
+    /// After-pickup progress: "After this pickup: 1.7 of 5 mi · 3.3 mi to go", or just the total once a
+    /// milestone is reached (the unlock line carries the news).
+    static func outcomeText(currentMiles: Double, distance: Double) -> String {
+        let after = currentMiles + earnedMiles(forDistance: distance)
+        if WalkRewardLadder.milestonesCrossed(from: currentMiles, to: after).isEmpty {
+            let next = WalkRewardLadder.nextMilestone(after: after)
+            let toGo = WalkRewardLadder.milesToNext(totalMiles: after)
+            return "After this pickup: \(miles(after)) of \(milestone(next)) mi · \(miles(toGo)) mi to go"
+        }
+        return "After this pickup: \(miles(after)) mi walked"
+    }
+
+    /// "Unlocks a reward: 50% off one bag" when this pickup reaches a milestone.
+    static func unlockText(currentMiles: Double, distance: Double) -> String? {
+        let crossed = WalkRewardLadder.milestonesCrossed(
+            from: currentMiles, to: currentMiles + earnedMiles(forDistance: distance)
+        ).count
+        guard crossed > 0 else { return nil }
+        let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
+        return crossed == 1 ? "Unlocks a reward: \(discount)" : "Unlocks \(crossed) rewards: \(discount) each"
+    }
 }

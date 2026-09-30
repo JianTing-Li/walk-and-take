@@ -280,4 +280,30 @@ struct OfferDetailModelTests {
         #expect(!setup.model.reserve.showsRewardToggle)
         #expect(setup.model.walkReviewLine == nil)
     }
+
+    // MARK: Effect on progress
+
+    func detailWithMiles(_ miles: Double) async -> OfferDetailModel {
+        let setup = await detail()
+        setup.harness.walkRewards.seed(miles: miles)
+        await setup.model.load()
+        return setup.model
+    }
+
+    @Test func detailShowsProgressAfterThisPickup() async throws {
+        let card = try #require(await detailWithMiles(1.2).walkCard)
+        #expect(card.outcome == "After this pickup: 1.4 of 5 mi · 3.6 mi to go")
+        #expect(card.unlock == nil)
+    }
+
+    @Test func detailSaysWhenThePickupUnlocksAReward() async throws {
+        let card = try #require(await detailWithMiles(0.9).walkCard)
+        #expect(card.outcome == "After this pickup: 1.1 mi walked")
+        #expect(card.unlock == "Unlocks a reward: 50% off one bag")
+    }
+
+    @Test func aFirstTimeWalkerSeesTheFirstReward() async throws {
+        let card = try #require(await detail().model.walkCard)
+        #expect(card.outcome == "After this pickup: 0.2 of 1 mi · 0.8 mi to go")
+    }
 }
