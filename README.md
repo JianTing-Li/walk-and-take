@@ -2,25 +2,31 @@
 
 # Walk & Take
 
-**Rescue surplus food from local cafés and bakeries, from breakfast to dinner.**
+**Rescue surplus food from local cafés and bakeries, then walk to pick it up and earn rewards.**
 
 An iOS 26 marketplace app, inspired by Too Good To Go, built with SwiftUI, SwiftData and Swift 6 strict concurrency.
-Zero third-party dependencies.
+Miles you walk to pickups add up to 50%-off rewards. Zero third-party dependencies.
 
 ![iOS 26](https://img.shields.io/badge/iOS-26.0%2B-000000?logo=apple&logoColor=white)
 ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
 ![SwiftData](https://img.shields.io/badge/Persistence-SwiftData-5E5CE6)
-![Tests](https://img.shields.io/badge/tests-220%20passing-2EA44F)
+![Tests](https://img.shields.io/badge/tests-369%20passing-2EA44F)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)
 
-<img src="docs/screenshots/splash.gif" width="260" alt="Launch splash: a walker comes to a café doorway, takes the rescue bag from the threshold and leaves with it">&nbsp;
-<img src="docs/screenshots/reserve-flow.gif" width="260" alt="Reserving a bag: Discover, reserve, confirmation with QR code, pickup screen">
+<img src="docs/screenshots/splash.gif" width="240" alt="Launch splash: a walker comes to a café doorway, takes the rescue bag from the threshold and leaves with it">&nbsp;
+<img src="docs/screenshots/reserve-flow.gif" width="240" alt="Reserving a bag with a walking reward: Discover, offer detail, reward on, reserve, animated Reward redeemed banner, pickup screen">&nbsp;
+<img src="docs/screenshots/walk-and-earn.gif" width="240" alt="Walking to a pickup: Start walk, live progress to the door, swipe to confirm, miles earned and a reward unlocked">
 
 <img src="docs/screenshots/discover.png" width="190" alt="Discover list">&nbsp;
 <img src="docs/screenshots/map.png" width="190" alt="Map with price pins">&nbsp;
 <img src="docs/screenshots/offer-detail.png" width="190" alt="Offer detail">&nbsp;
-<img src="docs/screenshots/confirmation.png" width="190" alt="Confirmation with QR code">
+<img src="docs/screenshots/confirmation.png" width="190" alt="Confirmation with QR code and the Reward redeemed banner">
+
+<img src="docs/screenshots/walk-progress.png" width="190" alt="Walk in progress with live miles walked and miles to go">&nbsp;
+<img src="docs/screenshots/walk-earned.png" width="190" alt="Miles earned card with a catchphrase and a reward unlocked">&nbsp;
+<img src="docs/screenshots/profile-rewards.png" width="190" alt="Rewards list: one ready to use, one used">&nbsp;
+<img src="docs/screenshots/walk-history.png" width="190" alt="Walk history with miles per pickup">
 
 </div>
 
@@ -31,12 +37,16 @@ Zero third-party dependencies.
 - **Time zones handled correctly.** Business time always runs on New York time through an injected clock.
   Offers roll over daily, tomorrow's bags appear at 8 PM, and everything stays correct across midnight and
   daylight-saving changes. A built-in time-travel tool makes it easy to demo.
+- **Walk to earn.** Reserve a bag, tap Start walk, and walk to the pickup. GPS fixes are checked (speed, accuracy,
+  simulated locations, where the walk ends) and up to 2 verified miles per pickup count toward rewards, which unlock at 1, 5 and 15 mi,
+  then every 10 mi after that (25, 35, ...). Each reward is 50% off one bag. See the walking section of
+  [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Modular architecture.** Five Swift Package modules with enforced dependency rules. Feature screens only see
   Domain protocols, and the whole app is assembled in one place.
 - **Swift 6 strict concurrency with zero warnings.** Actors, `Sendable` value types, and no
   `@unchecked Sendable`.
-- **220 automated tests.** Swift Testing covers business rules, persistence, rollover and every view model,
-  plus an XCUITest for the full reserve flow. Every feature flag has its own test.
+- **369 automated tests.** 367 Swift Testing tests cover business rules, persistence, rollover, walk verification
+  and every view model, plus 2 XCUITests for the reserve and reward flows. Every feature flag has its own test.
 - **Polished details.** Dynamic Type, VoiceOver, dark mode, QR pickup codes, local notifications, MapKit
   browsing, and a location fallback when permission is denied.
 
@@ -47,7 +57,7 @@ flowchart LR
     App["App<br/><sub>composition root</sub>"] --> Features["CustomerFeatures<br/><sub>SwiftUI + @Observable view models</sub>"]
     App --> Data["MockData<br/><sub>SwiftData actors · seed · rollover</sub>"]
     Features --> Design["DesignSystem<br/><sub>tokens · components</sub>"]
-    Features --> Platform["Platform<br/><sub>clock · location · notifications · QR</sub>"]
+    Features --> Platform["Platform<br/><sub>clock · location · walk tracking · notifications · QR</sub>"]
     Data --> Platform
     Features --> Domain["Domain<br/><sub>models · rules · repository protocols</sub>"]
     Data --> Domain
@@ -64,10 +74,10 @@ flags.
 | UI | SwiftUI, MapKit, CoreImage (QR) |
 | State | `@Observable` MVVM, `AsyncStream` change feeds |
 | Persistence | SwiftData (two actors sharing one container) |
-| Platform | CoreLocation (`CLLocationUpdate`, `CLServiceSession`), UserNotifications |
+| Platform | CoreLocation (`CLLocationUpdate`, `CLServiceSession`, `CLBackgroundActivitySession`), UserNotifications |
 | Quality | Swift Testing, XCUITest, `swift-format` |
 
-About 9k lines of app code and 3.5k lines of tests.
+About 11.7k lines of app code and 5.5k lines of tests.
 
 ## Run it
 
@@ -84,8 +94,19 @@ In debug builds, **Profile → Developer** has:
   back to live time.
 - **Seed map**: all 21 seed restaurants with the 1.5 mi service area.
 
-Launch arguments (the UI test uses these): `-UITestInMemoryStore`, `-UITestNow 2026-09-24T08:00:00-04:00`,
+Launch arguments (the UI tests use these): `-UITestInMemoryStore`, `-UITestNow 2026-09-24T08:00:00-04:00`,
 `-UITestFixedLocation`, `-UITestSkipSplash`.
+
+Walking rewards demo arguments (debug builds only):
+
+| Argument | Effect |
+|---|---|
+| `-UITestSeedReward` | Start with one finished 1.2 mi walk and one banked 50% reward |
+| `-UITestSeedMiles 4.7` | Start with one finished walk of that many miles (banks the milestones it reaches) |
+| `-UITestSeedHistory` | Start with three finished walks at real restaurants (0.4, 0.9, 0.6 mi) |
+| `-UITestSimulateWalk` | Walks use a scripted 0.5 mi stroll (about 24 s) instead of GPS, so Start walk can be demoed in the simulator |
+
+The seed arguments can be combined, for example `-UITestSeedHistory -UITestSeedMiles 3.5` gives two banked rewards.
 
 Run the tests from the terminal:
 

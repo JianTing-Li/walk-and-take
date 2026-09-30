@@ -32,6 +32,11 @@ struct PickupView<RateSheet: View>: View {
         .navigationTitle(model.restaurantName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $model.rateRequest, content: rateSheet)
+        .alert("Couldn't start your walk", isPresented: $model.walkFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please try again.")
+        }
         .alert("Pickup couldn't be confirmed", isPresented: $model.collectFailed) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -44,6 +49,8 @@ struct PickupView<RateSheet: View>: View {
         ScrollView {
             VStack(spacing: Spacing.xl) {
                 if let header = model.header { StatusHeader(header: header) }
+
+                if let section = model.walkSection { walkSection(section) }
 
                 if model.isActive {
                     PickupCodeCard(code: model.code)
@@ -69,6 +76,9 @@ struct PickupView<RateSheet: View>: View {
                 }
 
                 if model.status == .collected {
+                    if let earned = model.walkEarned {
+                        WalkEarnedCard(earned).accessibilityIdentifier("pickup.walkEarned")
+                    }
                     RatingCard(
                         restaurantName: model.restaurantName, review: model.review, canReview: model.canReview
                     ) { model.rate(stars: $0) }
@@ -90,6 +100,62 @@ struct PickupView<RateSheet: View>: View {
         }
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) { bottomBar }
+    }
+
+    @ViewBuilder
+    private func walkSection(_ section: PickupModel.WalkSection) -> some View {
+        switch section {
+        case .opensLater(let text):
+            Label(text, systemImage: "figure.walk")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(Spacing.m)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
+        case .ready(let content):
+            VStack(spacing: Spacing.m) {
+                WalkRewardCard(content)
+                Button {
+                    Task { await model.startWalk() }
+                } label: {
+                    Label("Start walk", systemImage: "figure.walk")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.splashTeal)
+                .accessibilityIdentifier("pickup.startWalk")
+            }
+        case .walking(let walking):
+            VStack(alignment: .leading, spacing: 6) {
+                Label(walking.title, systemImage: "figure.walk.motion")
+                    .font(.headline)
+                    .foregroundStyle(Color.splashTeal)
+                if let fraction = walking.fraction {
+                    ProgressView(value: fraction)
+                        .tint(Color.splashTeal)
+                        .accessibilityHidden(true)
+                }
+                Text(walking.progressText)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("pickup.walkProgress")
+                if let counting = walking.countingText {
+                    Text(counting).font(.footnote.weight(.semibold)).foregroundStyle(Color.splashTeal)
+                }
+                Text(walking.detail).font(.subheadline).foregroundStyle(.secondary)
+                if let warning = walking.warning {
+                    Label(warning, systemImage: "location.slash.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.l)
+            .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("pickup.walkInProgress")
+        }
     }
 
     @ViewBuilder

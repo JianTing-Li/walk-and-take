@@ -62,6 +62,14 @@ struct MapBrowseModelTests {
         #expect(map.center == Fixture.licCenter)
         #expect(map.maxDistanceMiles == 0.5)
         #expect(map.maxDistanceText == "0.5")
-        #expect(!map.pins.contains { $0.offerID.hasPrefix("lunch") })  // Mid Deli is ~0.54 mi
+        #expect(!map.pins.contains { $0.offerID.hasPrefix("lunch") })  // Mid Deli is ~0.60 mi
+    }
+
+    @Test func theSelectedCardShowsTheWalkReward() async throws {
+        let map = await map(at: Fixture.sep(24, 8))
+        map.select("breakfast-2026-09-24")
+        #expect(try #require(map.selectedCard).walkRewardText == "+0.2 mi toward a reward")
+        map.select("bakery-2026-09-24")  // sold out
+        #expect(try #require(map.selectedCard).walkRewardText == nil)
     }
 }

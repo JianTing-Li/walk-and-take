@@ -17,6 +17,8 @@ public final class ReserveModel {
         case noLongerAvailable
         /// Tomorrow's bags can't be reserved before 20:00 New York.
         case notOpenYet
+        /// The chosen walking reward was already used.
+        case rewardUnavailable
         /// Anything unexpected (e.g. storage).
         case failed
 
@@ -26,6 +28,7 @@ public final class ReserveModel {
             switch self {
             case .noLongerAvailable: "This bag is no longer available"
             case .notOpenYet: "Opens for reservations at 8 PM"
+            case .rewardUnavailable: "That reward was already used"
             case .failed: "Something went wrong"
             }
         }
@@ -34,6 +37,7 @@ public final class ReserveModel {
             switch self {
             case .noLongerAvailable: "It sold out or the pickup window ended. Try another bag nearby."
             case .notOpenYet: "Tomorrow's bags can be reserved from 8 PM tonight."
+            case .rewardUnavailable: "Your bag wasn't reserved. Pick another reward, or reserve at full price."
             case .failed: "Your bag wasn't reserved. Please try again."
             }
         }
@@ -44,6 +48,13 @@ public final class ReserveModel {
     public private(set) var isReserving = false
     public var alert: Alert?
     public var confirmation: ReservationConfirmation?
+    /// Turn on to take the banked reward's 50% off one bag.
+    public var useReward = false
+    /// The oldest unused walking reward, if the flag is on.
+    public private(set) var availableReward: Reward?
+    /// How many unused walking rewards are banked.
+    public private(set) var availableRewardCount = 0
+    public private(set) var unitPrice = Money.zero
 
     private let offerID: String
     private let dependencies: CustomerDependencies
@@ -54,26 +65,74 @@ public final class ReserveModel {
     }
 
     /// Keeps the stepper within 1…min(3, bags left).
-    func update(quantityLeft: Int) {
+    func update(quantityLeft: Int, unitPrice: Money) {
         maxQuantity = max(1, ReservationPolicy.maxQuantity(forNewReservationWithLeft: quantityLeft))
         quantity = min(max(quantity, 1), maxQuantity)
+        self.unitPrice = unitPrice
     }
+
+    /// Reloads the banked rewards. The toggle turns itself off if the reward is gone.
+    func refreshRewards() async {
+        guard dependencies.flags.walkRewards else {
+            availableReward = nil
+            availableRewardCount = 0
+            useReward = false
+            return
+        }
+        let rewards = (try? await dependencies.walkRewards.rewards()) ?? []
+        let unused = rewards.filter(\.isAvailable)
+        availableRewardCount = unused.count
+        availableReward = unused.min { $0.earnedAt < $1.earnedAt }
+        if availableReward == nil { useReward = false }
+    }
+
+    public var showsRewardToggle: Bool { availableReward != nil }
+
+    /// What the reward takes off: 50% of one bag. Zero when it isn't being used.
+    public var rewardDiscount: Money {
+        useReward && availableReward != nil ? unitPrice.discount(percent: WalkRewardLadder.discountPercent) : .zero
+    }
+
+    public var total: Money { unitPrice * quantity - rewardDiscount }
 
     public func reserve() async {
         guard !isReserving else { return }
         isReserving = true
         defer { isReserving = false }
         let now = dependencies.clock.now
+        let reservationID = UUID()
+        var rewardID: UUID?
+        if useReward, let reward = availableReward {
+            // Claim the reward first so it can only ever back one reservation.
+            do {
+                _ = try await dependencies.walkRewards.redeemReward(
+                    id: reward.id, reservationID: reservationID, at: now)
+                rewardID = reward.id
+            } catch {
+                await refreshRewards()
+                alert = .rewardUnavailable
+                return
+            }
+        }
         do {
             let reservation = try await dependencies.reservations.reserve(
-                offerID: offerID, quantity: quantity, at: now)
+                offerID: offerID, quantity: quantity, reservationID: reservationID, rewardID: rewardID, at: now)
             quantity = 1
+            useReward = false
+            // Count what's left after this one before telling the customer.
+            if rewardID != nil { await refreshRewards() }
             confirmation = ReservationConfirmation(
-                reservation: reservation, now: now, showsChangePolicy: dependencies.flags.manageOrder)
+                reservation: reservation, now: now, showsChangePolicy: dependencies.flags.manageOrder,
+                showsWalkReminder: dependencies.flags.walkRewards, rewardsLeft: availableRewardCount)
         } catch let error as ReservationError {
             alert = error == .notVisibleYet ? .notOpenYet : .noLongerAvailable
         } catch {
             alert = .failed
+        }
+        if rewardID != nil {
+            // If the reservation failed, hand the reward back.
+            if confirmation == nil { try? await dependencies.walkRewards.releaseReward(reservationID: reservationID) }
+            await refreshRewards()
         }
     }
 }

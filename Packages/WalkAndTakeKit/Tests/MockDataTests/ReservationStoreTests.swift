@@ -177,4 +177,26 @@ struct ReservationStoreTests {
         #expect(await changes.next() == .stockChanged(offerID: earlyBird))
         #expect(await changes.next() == .reservationsChanged)
     }
+
+    // MARK: Walking reward
+
+    @Test func aRewardTakesHalfOffOneBagAndKeepsTheReservationID() async throws {
+        let market = try await stores().marketplace
+        let id = UUID()
+        let rewardID = UUID()
+        let r = try await market.reserve(
+            offerID: earlyBird, quantity: 2, reservationID: id, rewardID: rewardID, at: TestEnv.sep(24, 7))
+        #expect(r.id == id)
+        #expect(r.rewardID == rewardID)
+        #expect(r.discount == Money(cents: 299))  // 50% of $5.99, rounded down
+        #expect(r.total == Money(cents: 899))  // 2 x $5.99 - $2.99
+        #expect(try await market.reservation(id: id)?.discount == Money(cents: 299))
+    }
+
+    @Test func noRewardMeansNoDiscount() async throws {
+        let market = try await stores().marketplace
+        let r = try await market.reserve(offerID: earlyBird, quantity: 1, at: TestEnv.sep(24, 7))
+        #expect(r.rewardID == nil)
+        #expect(r.discount == .zero)
+    }
 }

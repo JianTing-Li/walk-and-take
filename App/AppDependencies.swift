@@ -28,6 +28,7 @@ final class AppDependencies {
     let marketplace: MarketplaceStore
     let userData: UserDataStore
     let location: any LocationProvider
+    let walkTracker: any WalkTracking
     let notifications: any NotificationScheduler
     let notificationDelegate = NotificationBannerDelegate()
     let rollover: RolloverService
@@ -78,6 +79,13 @@ final class AppDependencies {
         #else
             location = DeviceLocationProvider(source: CoreLocationSource())
         #endif
+        #if DEBUG
+            walkTracker =
+                options.simulateWalk
+                ? SimulatedWalkTracker() : LiveWalkTracker(source: CoreLocationWalkSource())
+        #else
+            walkTracker = LiveWalkTracker(source: CoreLocationWalkSource())
+        #endif
         notifications = LiveNotificationScheduler()
         rollover = RolloverService(
             marketplace: marketplace, userData: userData, notifications: notifications, clock: clock,
@@ -92,7 +100,9 @@ final class AppDependencies {
         screens = CustomerScreens(
             dependencies: CustomerDependencies(
                 offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
-                preferences: userData, location: location, notifications: notifications, resetter: resetter,
+                preferences: userData, walkRewards: userData, walkTracker: walkTracker, location: location,
+                notifications: notifications,
+                resetter: resetter,
                 clock: clock,
                 flags: flags),
             navigation: navigation,
@@ -108,7 +118,39 @@ final class AppDependencies {
                 switch route {
                 case .timeTravel: AnyView(TimeTravelView(clock: clock))
                 case .seedMap: AnyView(SeedMapView(offers: offers))
+                case .walkHistory, .rewards: AnyView(EmptyView())  // Profile shows these itself
                 }
+            }
+        }
+    #endif
+
+    #if DEBUG
+        /// `-UITestSeedReward` (one finished 1.2 mi walk, which banks the first 50% reward) or
+        /// `-UITestSeedMiles N` (one finished walk of N miles, banking whatever milestones that reaches).
+        func seedDemoRewardIfRequested() async {
+            let options = LaunchOptions.current
+            guard (try? await userData.walks().isEmpty) == true else { return }
+            if options.seedHistory { await seedDemoHistory() }
+            guard let miles = options.seedMiles ?? (options.seedReward ? 1.2 : nil) else { return }
+            let id = UUID()
+            _ = try? await userData.startWalk(reservationID: id, restaurantID: "demo", at: clock.now)
+            _ = try? await userData.finishWalk(
+                reservationID: id, verdict: .credited(miles: miles), at: clock.now, calendar: .current)
+        }
+
+        /// `-UITestSeedHistory`: three finished walks at real restaurants over the last two days.
+        private func seedDemoHistory() async {
+            guard let restaurants = try? await marketplace.restaurants(), restaurants.count >= 3 else { return }
+            let walks: [(restaurant: Restaurant, miles: Double, hoursAgo: Double)] = [
+                (restaurants[0], 0.4, 49), (restaurants[1], 0.9, 26), (restaurants[2], 0.6, 2),
+            ]
+            for entry in walks {
+                let finished = clock.now.addingTimeInterval(-entry.hoursAgo * 3600)
+                let id = UUID()
+                _ = try? await userData.startWalk(
+                    reservationID: id, restaurantID: entry.restaurant.id, at: finished.addingTimeInterval(-900))
+                _ = try? await userData.finishWalk(
+                    reservationID: id, verdict: .credited(miles: entry.miles), at: finished, calendar: .current)
             }
         }
     #endif

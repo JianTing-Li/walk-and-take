@@ -33,6 +33,10 @@ public struct Reservation: Identifiable, Hashable, Codable, Sendable {
     public var cancelledAt: Date?
     public var cancelReason: CancelReason?
     public var review: Review?
+    /// The walking reward applied to this reservation, if any.
+    public let rewardID: UUID?
+    /// Money taken off by the reward (50% of one bag). Zero when none was used.
+    public let discount: Money
 
     public init(
         id: UUID,
@@ -43,7 +47,9 @@ public struct Reservation: Identifiable, Hashable, Codable, Sendable {
         collectedAt: Date? = nil,
         cancelledAt: Date? = nil,
         cancelReason: CancelReason? = nil,
-        review: Review? = nil
+        review: Review? = nil,
+        rewardID: UUID? = nil,
+        discount: Money = .zero
     ) {
         self.id = id
         self.confirmationCode = confirmationCode
@@ -54,8 +60,10 @@ public struct Reservation: Identifiable, Hashable, Codable, Sendable {
         self.cancelledAt = cancelledAt
         self.cancelReason = cancelReason
         self.review = review
+        self.rewardID = rewardID
+        self.discount = discount
     }
 
-    public var total: Money { snapshot.unitPrice * quantity }
-    public var savings: Money { (snapshot.estimatedValue - snapshot.unitPrice) * quantity }
+    public var total: Money { snapshot.unitPrice * quantity - discount }
+    public var savings: Money { (snapshot.estimatedValue - snapshot.unitPrice) * quantity + discount }
 }

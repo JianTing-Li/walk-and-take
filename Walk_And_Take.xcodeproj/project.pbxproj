@@ -348,7 +348,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Walk & Take";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Walk & Take uses your location to show surprise bags near you. Without it, we show offers near Long Island City.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Walk & Take uses your location to show surprise bags near you and, while you walk to a pickup, to count your miles toward rewards. Without it, we show offers near Long Island City.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -390,7 +390,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Walk & Take";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Walk & Take uses your location to show surprise bags near you. Without it, we show offers near Long Island City.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Walk & Take uses your location to show surprise bags near you and, while you walk to a pickup, to count your miles toward rewards. Without it, we show offers near Long Island City.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

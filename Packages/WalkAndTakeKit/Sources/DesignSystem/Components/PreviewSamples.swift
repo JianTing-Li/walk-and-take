@@ -23,8 +23,17 @@ enum PreviewSamples {
         price: Money(cents: 599),
         estimatedValue: Money(cents: 1800),
         isAvailable: true,
-        fitsCommute: true
+        fitsCommute: true,
+        walkRewardText: "+0.2 mi toward a reward"
     )
+
+    static let bagCardFarther: BagCard.Content = {
+        var content = bagCard
+        content.distanceText = "0.9 mi away"
+        content.walkRewardText = "+0.9 mi toward a reward"
+        content.walkCompareText = "0.7 mi farther than the nearest · earns 0.7 mi more"
+        return content
+    }()
 
     static let bagCardUrgent: BagCard.Content = {
         var content = bagCard
@@ -64,6 +73,41 @@ enum PreviewSamples {
         isUrgent: true,
         price: Money(cents: 549),
         estimatedValue: Money(cents: 1500),
-        isAvailable: true
+        isAvailable: true,
+        walkRewardText: "+0.5 mi toward a reward"
+    )
+
+    static let walkEarned = WalkEarnedCard.Content(
+        headline: "+0.50 mi earned", catchphrase: "Walk it. Earn it.",
+        contribution: "Walked pickup #2 · added 0.50 mi",
+        progress: "1.70 mi walked in total · 3.30 mi to your next reward")
+
+    static let walkEarnedUnlock = WalkEarnedCard.Content(
+        headline: "+0.90 mi earned", catchphrase: "Every step pays off.",
+        contribution: "Walked pickup #3 · added 0.90 mi",
+        progress: "5.10 mi walked in total · 9.90 mi to your next reward",
+        unlock: "Reward unlocked: 50% off one bag")
+
+    static let walkProgress = WalkProgressCard.Content(
+        milesText: "1.2 mi", milesCaption: "walked to pickups", progress: 0.05,
+        targetTitle: "Next: 50% off one bag at 5 mi", targetDetail: "3.8 mi to go",
+        readyText: "1 reward ready to use")
+
+    static let walkProgressNew = WalkProgressCard.Content(
+        milesText: "0.0 mi", milesCaption: "walked to pickups", progress: 0,
+        targetTitle: "First reward: 50% off one bag at 1 mi", targetDetail: "1.0 mi to go")
+
+    static let walkCard = WalkRewardCard.Content(
+        title: "0.7 mi walk",
+        detail: "Earns +0.7 mi toward your next reward",
+        footnote: "Walk to the pickup to count your miles.",
+        outcome: "After this pickup: 1.9 of 5 mi · 3.1 mi to go"
+    )
+
+    static let walkCardUnlock = WalkRewardCard.Content(
+        title: "0.9 mi walk",
+        detail: "Earns +0.9 mi toward your next reward",
+        outcome: "After this pickup: 5.1 mi walked",
+        unlock: "Unlocks a reward: 50% off one bag"
     )
 }

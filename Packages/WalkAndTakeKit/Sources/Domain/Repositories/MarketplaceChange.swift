@@ -24,5 +24,7 @@ public enum UserDataChange: Hashable, Sendable {
     case favoritesChanged
     case preferencesChanged
     case commuteChanged
+    /// A walk, miles total or reward changed.
+    case walkRewardsChanged
     case reset
 }

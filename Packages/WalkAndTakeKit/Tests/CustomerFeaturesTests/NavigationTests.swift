@@ -15,7 +15,8 @@ struct NavigationTests {
     static func flags(favorites: Bool = true) -> FeatureFlags {
         FeatureFlags(
             mapBrowse: true, favorites: favorites, notifications: true, dietaryFilters: true,
-            manageOrder: true, reviews: true, impact: true, commute: false)
+            manageOrder: true, reviews: true, impact: true, commute: false,
+            walkRewards: true)
     }
 
     @Test func allFourTabsByDefault() {

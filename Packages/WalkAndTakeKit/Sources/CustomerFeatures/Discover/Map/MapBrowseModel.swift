@@ -98,7 +98,8 @@ public final class MapBrowseModel {
             isUrgent: status == .endingSoon,
             price: offer.price,
             estimatedValue: offer.estimatedValue,
-            isAvailable: status.isReservable
+            isAvailable: status.isReservable,
+            walkRewardText: catalog.walkRewardText(for: offer, status: status)
         )
     }
 

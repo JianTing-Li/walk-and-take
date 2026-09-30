@@ -75,7 +75,7 @@ public struct DiscoverView<Destination: View>: View {
                     }
                     CategoryChips(selection: $model.category)
                     Picker("Sort", selection: $model.sort) {
-                        ForEach(DiscoverSortOrder.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(model.availableSorts) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
 

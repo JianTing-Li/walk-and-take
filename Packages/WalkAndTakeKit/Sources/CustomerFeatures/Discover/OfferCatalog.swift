@@ -57,7 +57,20 @@ struct OfferCatalog: Sendable {
         String(format: "%.1f mi away", distanceMiles(to: offer))
     }
 
-    func card(for offer: Offer, at now: Date) -> BagCard.Content? {
+    /// "+0.7 mi toward a reward", only for bags you could still reserve.
+    func walkRewardText(for offer: Offer, status: OfferAvailability.Status) -> String? {
+        guard flags.walkRewards, status.isReservable else { return nil }
+        return WalkCopy.rewardPill(forDistance: distanceMiles(to: offer))
+    }
+
+    /// "Nearest bag" / "0.4 mi farther than the nearest · earns 0.4 mi more", for reservable bags when a
+    /// comparison baseline exists (two or more reservable bags).
+    func walkCompareText(for offer: Offer, status: OfferAvailability.Status, nearestMiles: Double?) -> String? {
+        guard flags.walkRewards, status.isReservable, let nearestMiles else { return nil }
+        return WalkCopy.compareText(distance: distanceMiles(to: offer), nearest: nearestMiles)
+    }
+
+    func card(for offer: Offer, at now: Date, nearestMiles: Double? = nil) -> BagCard.Content? {
         guard let restaurant = restaurant(for: offer) else { return nil }
         let status = OfferAvailability.status(of: offer, at: now)
         return BagCard.Content(
@@ -74,7 +87,9 @@ struct OfferCatalog: Sendable {
             price: offer.price,
             estimatedValue: offer.estimatedValue,
             isAvailable: status.isReservable,
-            fitsCommute: fitsCommute(offer)
+            fitsCommute: fitsCommute(offer),
+            walkRewardText: walkRewardText(for: offer, status: status),
+            walkCompareText: walkCompareText(for: offer, status: status, nearestMiles: nearestMiles)
         )
     }
 }

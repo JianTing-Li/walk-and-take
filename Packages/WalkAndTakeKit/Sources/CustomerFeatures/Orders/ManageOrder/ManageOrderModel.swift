@@ -75,10 +75,15 @@ public final class ManageOrderModel {
         }
     }
 
+    /// Cancelling gives back a walking reward the order used, since no food was collected.
     public func cancel() async {
         await perform {
-            try await dependencies.reservations.cancel(
+            let cancelled = try await dependencies.reservations.cancel(
                 reservationID: reservationID, reason: reason, at: dependencies.clock.now)
+            if cancelled.rewardID != nil {
+                try? await dependencies.walkRewards.releaseReward(reservationID: reservationID)
+            }
+            return cancelled
         }
     }
 

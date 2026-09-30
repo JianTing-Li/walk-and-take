@@ -17,6 +17,7 @@ public struct FeatureFlags: Hashable, Sendable {
     public var reviews: Bool
     public var impact: Bool
     public var commute: Bool
+    public var walkRewards: Bool
 
     public init(
         mapBrowse: Bool,
@@ -26,7 +27,8 @@ public struct FeatureFlags: Hashable, Sendable {
         manageOrder: Bool,
         reviews: Bool,
         impact: Bool,
-        commute: Bool
+        commute: Bool,
+        walkRewards: Bool
     ) {
         self.mapBrowse = mapBrowse
         self.favorites = favorites
@@ -36,6 +38,7 @@ public struct FeatureFlags: Hashable, Sendable {
         self.reviews = reviews
         self.impact = impact
         self.commute = commute
+        self.walkRewards = walkRewards
     }
 
     /// Alerts are tied to favorite restaurants, so they need both flags.

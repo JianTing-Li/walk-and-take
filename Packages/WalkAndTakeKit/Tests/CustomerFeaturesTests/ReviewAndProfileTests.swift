@@ -143,4 +143,79 @@ struct ProfileModelTests {
         let (off, _, _) = await profile(flags: Fixture.flags(dietaryFilters: false, impact: false, commute: true))
         #expect(!off.flags.impact && !off.flags.dietaryFilters && off.flags.commute)
     }
+
+    // MARK: Walking progress
+
+    /// Reloads a profile after the fake repository was seeded.
+    func profileWithWalks(miles: Double = 0, rewards: [Reward] = [], flags: FeatureFlags = Fixture.flags()) async
+        -> (ProfileModel, Harness)
+    {
+        let (model, harness, _) = await profile(flags: flags)
+        harness.walkRewards.seed(miles: miles, rewards: rewards)
+        await model.load()
+        return (model, harness)
+    }
+
+    static func reward(at miles: Double = 1) -> Reward { Reward(milestoneMiles: miles, earnedAt: Fixture.sep(20, 9)) }
+
+    @Test func aNewWalkerSeesTheFirstReward() async throws {
+        let (model, _) = await profileWithWalks()
+        let card = try #require(model.walkProgress)
+        #expect(card.milesText == "0.0 mi")
+        #expect(card.targetTitle == "First reward: 50% off one bag at 1 mi")
+        #expect(card.targetDetail == "1.0 mi to go")
+        #expect(card.progress == 0)
+        #expect(card.readyText == nil)
+    }
+
+    @Test func progressShowsMilesToTheNextRewardAndWhatIsReadyToUse() async throws {
+        let (model, _) = await profileWithWalks(miles: 1.2, rewards: [Self.reward()])
+        let card = try #require(model.walkProgress)
+        #expect(card.milesText == "1.2 mi")
+        #expect(card.targetTitle == "Next: 50% off one bag at 5 mi")
+        #expect(card.targetDetail == "3.8 mi to go")
+        #expect(abs(card.progress - 0.05) < 1e-9)
+        #expect(card.readyText == "1 reward ready to use")
+        #expect(model.availableRewards == 1)
+    }
+
+    @Test func usedRewardsDoNotCountAsReady() async throws {
+        var used = Self.reward()
+        used.redeemedAt = Fixture.sep(21, 9)
+        let (model, _) = await profileWithWalks(miles: 6, rewards: [used, Self.reward(at: 5), Self.reward(at: 5)])
+        #expect(model.availableRewards == 2)
+        #expect(try #require(model.walkProgress).readyText == "2 rewards ready to use")
+    }
+
+    @Test func reachingAMilestoneMovesTheTarget() async throws {
+        let (model, _) = await profileWithWalks(miles: 5)
+        let card = try #require(model.walkProgress)
+        #expect(card.targetTitle == "Next: 50% off one bag at 15 mi")
+        #expect(card.targetDetail == "10.0 mi to go")
+    }
+
+    @Test func progressUpdatesWhenAWalkFinishes() async throws {
+        let (model, harness) = await profileWithWalks()
+        let watching = Task { await model.run() }
+        defer { watching.cancel() }
+        let id = UUID()
+        _ = try await harness.walkRewards.startWalk(reservationID: id, restaurantID: "near", at: Fixture.sep(24, 8))
+        _ = try await harness.walkRewards.finishWalk(
+            reservationID: id, verdict: .credited(miles: 1.5), at: Fixture.sep(24, 9), calendar: NYCalendar.calendar)
+        #expect(await eventually { abs(model.walkMiles - 1.5) < 1e-9 })
+        #expect(model.availableRewards == 1)
+    }
+
+    @Test func resettingClearsMilesAndRewards() async {
+        let (model, _) = await profileWithWalks(miles: 6, rewards: [Self.reward()])
+        await model.resetDemoData()
+        #expect(model.walkMiles == 0)
+        #expect(model.availableRewards == 0)
+    }
+
+    @Test func walkProgressFollowsTheFlag() async {
+        let (model, _) = await profileWithWalks(miles: 2, flags: Fixture.flags(walkRewards: false))
+        #expect(!model.showsWalkProgress)
+        #expect(model.walkProgress == nil)
+    }
 }

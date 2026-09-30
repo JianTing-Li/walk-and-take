@@ -45,6 +45,11 @@ struct FeatureFlagTests {
         return model
     }
 
+    @Test func walkRewardsFlagIsOnInTheFixtureAndCanBeTurnedOff() {
+        #expect(Fixture.flags().walkRewards)
+        #expect(!Fixture.flags(walkRewards: false).walkRewards)
+    }
+
     @Test func mapBrowse() async {
         #expect(await discover(Fixture.flags()).showsMapToggle)
         #expect(await !discover(Fixture.flags(mapBrowse: false)).showsMapToggle)

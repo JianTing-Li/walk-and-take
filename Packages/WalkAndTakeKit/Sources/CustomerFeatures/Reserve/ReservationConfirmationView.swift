@@ -40,6 +40,22 @@ struct ReservationConfirmationView: View {
                 .padding(.vertical, Spacing.m).padding(.horizontal, Spacing.xxl)
                 .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
 
+                if let redeemed = confirmation.rewardRedeemed {
+                    RewardBanner(title: redeemed.title, detail: redeemed.detail, footer: redeemed.footer)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("confirmation.rewardRedeemed")
+                }
+
+                if let reminder = confirmation.walkReminderText {
+                    Label(reminder, systemImage: "figure.walk")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.splashTeal)
+                        .padding(Spacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
+                        .accessibilityIdentifier("confirmation.walkReminder")
+                }
+
                 Text(confirmation.policyText)
                     .multilineTextAlignment(.center)
                     .font(.footnote)
@@ -50,6 +66,9 @@ struct ReservationConfirmationView: View {
                     row("Where", confirmation.address)
                     row("How", confirmation.pickupInstructions)
                     row("Bags", confirmation.bagsText)
+                    if let rewardText = confirmation.rewardText {
+                        row("Reward", rewardText)
+                    }
                     row("Total", confirmation.totalText)
                 }
                 .padding(Spacing.l)

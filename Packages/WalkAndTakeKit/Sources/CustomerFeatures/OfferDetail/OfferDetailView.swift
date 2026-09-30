@@ -91,6 +91,10 @@ public struct OfferDetailView: View {
                     .background(
                         Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
 
+                    if let walkCard = model.walkCard {
+                        WalkRewardCard(walkCard)
+                    }
+
                     contents
                     priceRow
                 }
@@ -136,6 +140,32 @@ public struct OfferDetailView: View {
 
     private func reserveBar(_ reserve: ReserveModel) -> some View {
         VStack(spacing: Spacing.s) {
+            if let walkReviewLine = model.walkReviewLine {
+                Label(walkReviewLine, systemImage: "figure.walk")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.splashTeal)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let reminder = model.walkReminderLine {
+                Text(reminder)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("offerDetail.walkReminder")
+            }
+            if model.canReserve, reserve.showsRewardToggle {
+                Toggle(isOn: Bindable(reserve).useReward) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Use my walking reward").font(.subheadline.weight(.semibold))
+                        Text(model.rewardLine ?? "50% off one bag").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                .tint(.splashTeal)
+                // The whole row toggles, not just the small switch at its edge.
+                .contentShape(Rectangle())
+                .onTapGesture { reserve.useReward.toggle() }
+                .accessibilityIdentifier("offerDetail.useReward")
+            }
             if model.canReserve {
                 Stepper(
                     "Quantity: \(reserve.quantity)", value: Bindable(reserve).quantity, in: 1...reserve.maxQuantity)

@@ -88,7 +88,8 @@ public struct CustomerTabView<Discover: View, Orders: View, Favorites: View, Pro
         \.featureFlags,
         FeatureFlags(
             mapBrowse: true, favorites: false, notifications: true, dietaryFilters: true,
-            manageOrder: true, reviews: true, impact: true, commute: false)
+            manageOrder: true, reviews: true, impact: true, commute: false,
+            walkRewards: true)
     )
     .preferredColorScheme(.dark)
 }

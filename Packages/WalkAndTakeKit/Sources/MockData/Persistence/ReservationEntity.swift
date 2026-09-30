@@ -41,6 +41,10 @@ final class ReservationEntity {
     var pickupStart: Date
     var pickupEnd: Date
 
+    // Walking reward. The default lets existing rows migrate.
+    var rewardID: UUID?
+    var discountCents: Int = 0
+
     // Review
     var reviewOverall: Int?
     var reviewQuality: Int?
@@ -74,6 +78,8 @@ final class ReservationEntity {
         estimatedValueCents = s.estimatedValue.cents
         pickupStart = s.pickupWindow.start
         pickupEnd = s.pickupWindow.end
+        rewardID = reservation.rewardID
+        discountCents = reservation.discount.cents
         apply(reservation)
     }
 
@@ -122,7 +128,9 @@ final class ReservationEntity {
             collectedAt: collectedAt,
             cancelledAt: cancelledAt,
             cancelReason: cancelReasonRaw.flatMap(CancelReason.init(rawValue:)),
-            review: review
+            review: review,
+            rewardID: rewardID,
+            discount: Money(cents: discountCents)
         )
     }
 

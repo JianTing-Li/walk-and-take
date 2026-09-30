@@ -37,7 +37,11 @@ public struct ProfileView: View {
             }
             .navigationTitle("Profile")
             .navigationDestination(for: ProfileRoute.self) { route in
-                developerDestination?(route) ?? AnyView(EmptyView())
+                switch route {
+                case .walkHistory: WalkHistoryView(model: model.makeWalkHistory())
+                case .rewards: RewardsListView(model: model.makeRewardsList())
+                default: developerDestination?(route) ?? AnyView(EmptyView())
+                }
             }
         }
         .tint(.splashTeal)
@@ -46,6 +50,28 @@ public struct ProfileView: View {
 
     private var form: some View {
         Form {
+            if let walkProgress = model.walkProgress {
+                Section {
+                    WalkProgressCard(walkProgress)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    NavigationLink(value: ProfileRoute.rewards) {
+                        Label("Rewards", systemImage: "gift")
+                    }
+                    .accessibilityIdentifier("profile.rewards")
+                    NavigationLink(value: ProfileRoute.walkHistory) {
+                        Label("Walk history", systemImage: "list.bullet.rectangle")
+                    }
+                    .accessibilityIdentifier("profile.walkHistory")
+                } header: {
+                    Text("Walking rewards")
+                } footer: {
+                    Text(
+                        "Miles count from pickups you walk to. One pickup adds up to 2 mi. Use a reward when you reserve."
+                    )
+                }
+            }
+
             if model.showsImpact {
                 Section {
                     ImpactCard(impact: model.impact)
