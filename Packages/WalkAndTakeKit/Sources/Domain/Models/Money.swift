@@ -24,4 +24,9 @@ public struct Money: Hashable, Comparable, Sendable, Codable {
     public static func - (lhs: Money, rhs: Money) -> Money { Money(cents: lhs.cents - rhs.cents) }
     public static func * (lhs: Money, rhs: Int) -> Money { Money(cents: lhs.cents * rhs) }
     public static func += (lhs: inout Money, rhs: Money) { lhs = lhs + rhs }
+
+    /// The amount taken off by a whole-number percent discount. Rounds down, so the customer never pays less.
+    public func discount(percent: Int) -> Money {
+        Money(cents: cents * percent / 100)
+    }
 }
