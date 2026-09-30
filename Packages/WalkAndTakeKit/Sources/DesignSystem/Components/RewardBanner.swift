@@ -65,6 +65,8 @@ public struct RewardBanner: View {
     /// Fourteen dots fly out from the gift and fade.
     private static let confettiColors: [Color] = [.splashTeal, .orange, .black, .red]
     private static let confettiCount = 14
+    /// Side of each confetti square, in points.
+    private static let confettiSize: CGFloat = 10.8
 
     private var confetti: some View {
         ZStack {
@@ -73,7 +75,7 @@ public struct RewardBanner: View {
                 let reach: Double = index.isMultiple(of: 2) ? 74 : 52
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Self.confettiColors[index % Self.confettiColors.count])
-                    .frame(width: 9, height: 9)
+                    .frame(width: Self.confettiSize, height: Self.confettiSize)
                     .rotationEffect(.degrees(confettiSpread ? Double(index) * 70 : 0))
                     .offset(
                         x: confettiSpread ? cos(angle) * reach : 0,
