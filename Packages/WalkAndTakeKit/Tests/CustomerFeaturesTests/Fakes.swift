@@ -64,6 +64,43 @@ nonisolated final class FakeUserData: FavoritesRepository, PreferencesRepository
     }
 }
 
+/// Records walks without GPS; `finish` returns whatever a test scripted.
+nonisolated final class FakeWalkTracker: WalkTracking, Sendable {
+    private struct State {
+        var active: Set<UUID> = []
+        var locationOff = false
+        var script: [WalkSample] = []
+        var destinations: [UUID: Coordinate] = [:]
+    }
+
+    private let state = Mutex(State())
+
+    /// The fixes every walk will have recorded.
+    func script(_ samples: [WalkSample]) { state.withLock { $0.script = samples } }
+    func setLocationOff(_ off: Bool) { state.withLock { $0.locationOff = off } }
+    func isTracking(_ id: UUID) -> Bool { state.withLock { $0.active.contains(id) } }
+    func destination(of id: UUID) -> Coordinate? { state.withLock { $0.destinations[id] } }
+
+    func begin(reservationID: UUID, destination: Coordinate) async {
+        state.withLock {
+            $0.active.insert(reservationID)
+            $0.destinations[reservationID] = destination
+        }
+    }
+    func status(reservationID: UUID) async -> WalkTrackingStatus {
+        state.withLock { s in s.active.contains(reservationID) ? (s.locationOff ? .locationOff : .tracking) : .idle }
+    }
+    func samples(reservationID: UUID) async -> [WalkSample] {
+        state.withLock { $0.active.contains(reservationID) ? $0.script : [] }
+    }
+    func finish(reservationID: UUID) async -> [WalkSample] {
+        state.withLock { s in
+            guard s.active.remove(reservationID) != nil else { return [] }
+            return s.script
+        }
+    }
+}
+
 /// In-memory walks and rewards that follow the same rules as the real store.
 nonisolated final class FakeWalkRewards: WalkRewardsRepository, Sendable {
     private struct State {
@@ -289,6 +326,7 @@ struct Harness {
     let marketplace: FakeMarketplace
     let userData: FakeUserData
     let walkRewards = FakeWalkRewards()
+    let walkTracker = FakeWalkTracker()
     let clock: AdjustableClock
     let notifications = FakeNotifications()
     let resetter: FakeResetter
@@ -308,7 +346,8 @@ struct Harness {
         resetter = FakeResetter(marketplace: marketplace, userData: userData)
         dependencies = CustomerDependencies(
             offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
-            preferences: userData, walkRewards: walkRewards, location: FakeLocation(result: location),
+            preferences: userData, walkRewards: walkRewards, walkTracker: walkTracker,
+            location: FakeLocation(result: location),
             notifications: notifications,
             resetter: resetter, clock: clock, flags: flags)
     }

@@ -10,8 +10,8 @@ import Foundation
 
 enum WalkCopy {
     /// "0.7"
-    static func miles(_ miles: Double) -> String {
-        String(format: "%.1f", miles)
+    static func miles(_ miles: Double, places: Int = 1) -> String {
+        String(format: "%.\(places)f", miles)
     }
 
     /// Miles a pickup this far away would add, after the per-pickup cap.

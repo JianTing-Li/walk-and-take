@@ -28,6 +28,7 @@ final class AppDependencies {
     let marketplace: MarketplaceStore
     let userData: UserDataStore
     let location: any LocationProvider
+    let walkTracker: any WalkTracking
     let notifications: any NotificationScheduler
     let notificationDelegate = NotificationBannerDelegate()
     let rollover: RolloverService
@@ -78,6 +79,13 @@ final class AppDependencies {
         #else
             location = DeviceLocationProvider(source: CoreLocationSource())
         #endif
+        #if DEBUG
+            walkTracker =
+                options.simulateWalk
+                ? SimulatedWalkTracker() : LiveWalkTracker(source: CoreLocationWalkSource())
+        #else
+            walkTracker = LiveWalkTracker(source: CoreLocationWalkSource())
+        #endif
         notifications = LiveNotificationScheduler()
         rollover = RolloverService(
             marketplace: marketplace, userData: userData, notifications: notifications, clock: clock,
@@ -92,7 +100,8 @@ final class AppDependencies {
         screens = CustomerScreens(
             dependencies: CustomerDependencies(
                 offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
-                preferences: userData, walkRewards: userData, location: location, notifications: notifications,
+                preferences: userData, walkRewards: userData, walkTracker: walkTracker, location: location,
+                notifications: notifications,
                 resetter: resetter,
                 clock: clock,
                 flags: flags),

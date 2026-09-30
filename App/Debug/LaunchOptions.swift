@@ -7,6 +7,7 @@
 //    -UITestNow 2026-09-24T08:00:00-04:00   freeze the clock at an ISO 8601 instant
 //    -UITestFixedLocation            use the LIC center as a device fix (no permission prompt)
 //    -UITestSeedReward               start with 1.2 walked miles and one banked 50% reward
+//    -UITestSimulateWalk             walks use a scripted 0.5 mi walking track instead of GPS
 //    -UITestSkipSplash               start on the tabs (UI tests can't reliably wait out the animation)
 //
 
@@ -21,6 +22,7 @@
         var fixedLocation = false
         var skipSplash = false
         var seedReward = false
+        var simulateWalk = false
 
         static var current: LaunchOptions {
             LaunchOptions(arguments: ProcessInfo.processInfo.arguments)
@@ -31,6 +33,7 @@
             fixedLocation = arguments.contains("-UITestFixedLocation")
             skipSplash = arguments.contains("-UITestSkipSplash")
             seedReward = arguments.contains("-UITestSeedReward")
+            simulateWalk = arguments.contains("-UITestSimulateWalk")
             if let index = arguments.firstIndex(of: "-UITestNow"), arguments.indices.contains(index + 1) {
                 fixedNow = try? Date(arguments[index + 1], strategy: .iso8601)
             }
