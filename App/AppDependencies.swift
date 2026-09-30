@@ -124,13 +124,17 @@ final class AppDependencies {
     #endif
 
     #if DEBUG
-        /// `-UITestSeedReward`: one finished 1.2 mi walk, which banks the first 50% reward.
+        /// `-UITestSeedReward` (one finished 1.2 mi walk, which banks the first 50% reward) or
+        /// `-UITestSeedMiles N` (one finished walk of N miles, banking whatever milestones that reaches).
         func seedDemoRewardIfRequested() async {
-            guard LaunchOptions.current.seedReward, (try? await userData.rewards().isEmpty) == true else { return }
+            let options = LaunchOptions.current
+            guard let miles = options.seedMiles ?? (options.seedReward ? 1.2 : nil),
+                (try? await userData.walks().isEmpty) == true
+            else { return }
             let id = UUID()
             _ = try? await userData.startWalk(reservationID: id, restaurantID: "demo", at: clock.now)
             _ = try? await userData.finishWalk(
-                reservationID: id, verdict: .credited(miles: 1.2), at: clock.now, calendar: .current)
+                reservationID: id, verdict: .credited(miles: miles), at: clock.now, calendar: .current)
         }
     #endif
 

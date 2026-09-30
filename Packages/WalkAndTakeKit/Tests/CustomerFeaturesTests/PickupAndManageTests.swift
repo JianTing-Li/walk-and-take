@@ -294,6 +294,73 @@ struct PickupWalkingTests {
         #expect(model.liveProgress == nil)
     }
 
+    // MARK: Miles earned
+
+    @Test func aWalkedPickupShowsTheMilesEarnedWithTheFirstCatchphrase() async throws {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 8))
+        #expect(model.walkEarned == nil)  // nothing until the pickup is done
+        await model.startWalk()
+        await model.collect()
+        let card = try #require(model.walkEarned)
+        #expect(card.headline == "+0.30 mi earned")
+        #expect(card.catchphrase == "Walk&Take: every mile gets you something.")
+        #expect(card.contribution == "Walked pickup #1 · added 0.30 mi")
+        #expect(card.progress == "0.30 mi walked in total · 0.70 mi to your next reward")
+        #expect(card.unlock == nil)
+    }
+
+    @Test func eachCreditedPickupGetsTheNextCatchphrase() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkRewards.seed(miles: 0.4)  // one earlier credited pickup
+        await model.startWalk()
+        await model.collect()
+        let card = try #require(model.walkEarned)
+        #expect(card.catchphrase == "Walk it. Earn it.")
+        #expect(card.contribution == "Walked pickup #2 · added 0.30 mi")
+        #expect(card.progress == "0.70 mi walked in total · 0.30 mi to your next reward")
+    }
+
+    @Test func reachingAMilestoneShowsTheUnlock() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkRewards.seed(miles: 0.9)
+        await model.startWalk()
+        await model.collect()
+        let card = try #require(model.walkEarned)
+        #expect(card.unlock == "Reward unlocked: 50% off one bag")
+        #expect(card.progress == "1.20 mi walked in total · 3.80 mi to your next reward")
+    }
+
+    @Test func theSameCardShowsWhenTheOrderIsOpenedAgain() async throws {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkRewards.seed(miles: 0.9)
+        await model.startWalk()
+        await model.collect()
+        let reopened = PickupModel(
+            reservationID: reservation.id, origin: ResolvedLocation(coordinate: Fixture.licCenter, source: .device),
+            dependencies: harness.dependencies)
+        await reopened.load()
+        #expect(reopened.walkEarned == model.walkEarned)
+        #expect(reopened.walkEarned?.unlock != nil)
+    }
+
+    @Test func noCardWithoutCreditedMilesOrWithoutAWalk() async {
+        let (rejected, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkTracker.script(Self.track(simulated: true))
+        await rejected.startWalk()
+        await rejected.collect()
+        #expect(rejected.walkEarned == nil)
+
+        let (unwalked, _, _) = await pickup(at: Fixture.sep(24, 8))
+        await unwalked.collect()
+        #expect(unwalked.walkEarned == nil)
+    }
+
+    @Test func noCardWithTheFlagOff() async {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 8), flags: Fixture.flags(walkRewards: false))
+        await model.collect()
+        #expect(model.walkEarned == nil)
+    }
+
     // MARK: Completing
 
     @Test func swipingAtTheCounterCreditsTheMiles() async throws {

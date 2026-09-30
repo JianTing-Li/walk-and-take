@@ -32,6 +32,8 @@ struct ComponentRenderTests {
         ("WalkRewardPill", AnyView(WalkRewardPill("+0.7 mi toward a reward"))),
         ("WalkRewardCard", AnyView(WalkRewardCard(PreviewSamples.walkCard))),
         ("WalkRewardCardUnlock", AnyView(WalkRewardCard(PreviewSamples.walkCardUnlock))),
+        ("WalkEarnedCard", AnyView(WalkEarnedCard(PreviewSamples.walkEarned))),
+        ("WalkEarnedCardUnlock", AnyView(WalkEarnedCard(PreviewSamples.walkEarnedUnlock))),
         ("WalkProgressCard", AnyView(WalkProgressCard(PreviewSamples.walkProgress))),
         ("WalkProgressCardNew", AnyView(WalkProgressCard(PreviewSamples.walkProgressNew))),
         ("StatusBadge", AnyView(StatusBadge(text: "Ends in 12 min", isUrgent: true))),

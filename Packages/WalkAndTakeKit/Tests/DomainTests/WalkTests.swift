@@ -272,3 +272,74 @@ struct WalkProgressTests {
             WalkVerifier.verify(samples: samples, destination: destination) == .credited(miles: progress.creditedMiles))
     }
 }
+
+@Suite("WalkCatchphrases and WalkEarnings")
+struct WalkEarningsTests {
+    func walk(_ miles: Double, finished hour: Int?, day: Int = 24) -> Walk {
+        Walk(
+            reservationID: UUID(), restaurantID: "r", startedAt: Fixtures.date(6, day: day),
+            finishedAt: hour.map { Fixtures.date($0, day: day) }, creditedMiles: miles)
+    }
+
+    @Test func tenDistinctLinesStartingWithTheAppNameOne() {
+        #expect(WalkCatchphrases.all.count == 10)
+        #expect(Set(WalkCatchphrases.all).count == 10)
+        #expect(WalkCatchphrases.phrase(forWalkNumber: 1) == "Walk&Take: every mile gets you something.")
+    }
+
+    @Test func linesCycleInOrderAndWrap() {
+        let firstTwenty = (1...20).map(WalkCatchphrases.phrase(forWalkNumber:))
+        #expect(Array(firstTwenty[0..<10]) == WalkCatchphrases.all)
+        #expect(Array(firstTwenty[10..<20]) == WalkCatchphrases.all)
+        #expect(WalkCatchphrases.phrase(forWalkNumber: 2) != WalkCatchphrases.phrase(forWalkNumber: 1))
+        #expect(WalkCatchphrases.phrase(forWalkNumber: 0) == WalkCatchphrases.phrase(forWalkNumber: 1))
+    }
+
+    @Test func aFirstWalkAddsToZero() throws {
+        let first = walk(0.5, finished: 8)
+        let earnings = try #require(WalkEarnings.of(first, in: [first]))
+        #expect(earnings.milesEarned == 0.5)
+        #expect(earnings.totalBefore == 0)
+        #expect(earnings.totalAfter == 0.5)
+        #expect(earnings.walkNumber == 1)
+        #expect(earnings.unlockedMilestones.isEmpty)
+        #expect(abs(earnings.milesToNextReward - 0.5) < 1e-9)
+        #expect(earnings.nextMilestone == 1)
+    }
+
+    @Test func laterWalksBuildOnEarlierOnesByFinishTime() throws {
+        let a = walk(0.6, finished: 8)
+        let b = walk(0.7, finished: 9)
+        let c = walk(1.0, finished: 10)
+        let shuffled = [c, a, b]
+        let second = try #require(WalkEarnings.of(b, in: shuffled))
+        #expect(second.walkNumber == 2)
+        #expect(abs(second.totalBefore - 0.6) < 1e-9)
+        #expect(abs(second.totalAfter - 1.3) < 1e-9)
+        #expect(second.unlockedMilestones == [1])
+        #expect(try #require(WalkEarnings.of(c, in: shuffled)).walkNumber == 3)
+    }
+
+    @Test func aWalkThatLandsOnAMilestoneUnlocksIt() throws {
+        let a = walk(1.5, finished: 8)
+        let b = walk(2.0, finished: 9)
+        let c = walk(1.5, finished: 10)  // 1.5 + 2.0 + 1.5 = 5.0
+        let earnings = try #require(WalkEarnings.of(c, in: [a, b, c]))
+        #expect(earnings.unlockedMilestones == [5])
+    }
+
+    @Test func rejectedAndUnfinishedWalksHaveNoEarningsAndDontCount() throws {
+        let rejected = walk(0, finished: 8)
+        let unfinished = walk(0.4, finished: nil)
+        let real = walk(0.5, finished: 9)
+        #expect(WalkEarnings.of(rejected, in: [rejected]) == nil)
+        #expect(WalkEarnings.of(unfinished, in: [unfinished]) == nil)
+        let earnings = try #require(WalkEarnings.of(real, in: [rejected, unfinished, real]))
+        #expect(earnings.walkNumber == 1)
+        #expect(earnings.totalBefore == 0)
+    }
+
+    @Test func aWalkMissingFromTheHistoryHasNoEarnings() {
+        #expect(WalkEarnings.of(walk(0.5, finished: 8), in: []) == nil)
+    }
+}

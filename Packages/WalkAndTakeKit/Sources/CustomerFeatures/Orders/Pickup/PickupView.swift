@@ -76,6 +76,9 @@ struct PickupView<RateSheet: View>: View {
                 }
 
                 if model.status == .collected {
+                    if let earned = model.walkEarned {
+                        WalkEarnedCard(earned).accessibilityIdentifier("pickup.walkEarned")
+                    }
                     RatingCard(
                         restaurantName: model.restaurantName, review: model.review, canReview: model.canReview
                     ) { model.rate(stars: $0) }

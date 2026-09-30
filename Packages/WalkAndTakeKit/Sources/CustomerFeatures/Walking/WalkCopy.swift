@@ -5,6 +5,7 @@
 //  The walking-reward wording shared by Discover, the map and Offer Detail.
 //
 
+import DesignSystem
 import Domain
 import Foundation
 import Platform
@@ -115,5 +116,25 @@ enum WalkCopy {
     /// "Counting +0.30 mi so far" once some of the walk counts.
     static func countingText(_ progress: WalkProgress) -> String? {
         progress.creditedMiles > 0 ? "Counting +\(miles(progress.creditedMiles, places: 2)) mi so far" : nil
+    }
+
+    // MARK: Earned
+
+    /// The card after a walked pickup, from what that pickup added to the customer's history.
+    static func earnedCard(_ earnings: WalkEarnings) -> WalkEarnedCard.Content {
+        let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
+        let earned = miles(earnings.milesEarned, places: 2)
+        return WalkEarnedCard.Content(
+            headline: "+\(earned) mi earned",
+            catchphrase: earnings.catchphrase,
+            contribution: "Walked pickup #\(earnings.walkNumber) · added \(earned) mi",
+            progress:
+                "\(miles(earnings.totalAfter, places: 2)) mi walked in total · "
+                + "\(miles(earnings.milesToNextReward, places: 2)) mi to your next reward",
+            unlock: earnings.unlockedMilestones.isEmpty
+                ? nil
+                : earnings.unlockedMilestones.count == 1
+                    ? "Reward unlocked: \(discount)"
+                    : "\(earnings.unlockedMilestones.count) rewards unlocked: \(discount) each")
     }
 }

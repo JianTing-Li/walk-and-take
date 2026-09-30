@@ -37,6 +37,9 @@ public final class PickupModel {
     public private(set) var walkCompletion: WalkCompletion?
     /// Live progress of the walk in progress, from the fixes recorded so far.
     public private(set) var liveProgress: WalkProgress?
+    /// What a finished, credited walk added to the customer's miles. Worked out from their walk history,
+    /// so it's the same right after pickup and whenever the order is opened later.
+    public private(set) var earnings: WalkEarnings?
     /// Stars tapped on the rating card; presents the rating sheet.
     public var rateRequest: RateRequest?
 
@@ -97,6 +100,7 @@ public final class PickupModel {
     private func refreshWalk() async {
         guard flags.walkRewards else { return }
         walk = try? await dependencies.walkRewards.walk(reservationID: reservationID)
+        await refreshEarnings()
         guard let reservation else { return }
         var tracking = await dependencies.walkTracker.status(reservationID: reservationID)
         switch status {
@@ -116,6 +120,16 @@ public final class PickupModel {
         }
         trackingStatus = tracking
         await refreshLiveProgress()
+    }
+
+    private func refreshEarnings() async {
+        guard let walk, walk.finishedAt != nil, walk.creditedMiles > 0,
+            let walks = try? await dependencies.walkRewards.walks()
+        else {
+            earnings = nil
+            return
+        }
+        earnings = WalkEarnings.of(walk, in: walks)
     }
 
     /// Re-reads the recorded fixes while a walk is in progress. Cleared when there's no walk to show.
@@ -176,6 +190,7 @@ public final class PickupModel {
         } catch {
             self.walk = try? await dependencies.walkRewards.walk(reservationID: reservationID)
         }
+        await refreshEarnings()
     }
 
     public func rate(stars: Int) {
@@ -324,6 +339,12 @@ public final class PickupModel {
         }
         guard walk == nil, now < WalkPolicy.startOpensAt(for: reservation) else { return nil }
         return .opensLater("Start walk opens at \(time(WalkPolicy.startOpensAt(for: reservation)))")
+    }
+
+    /// The "miles earned" celebration after a credited walk. Nil for other pickups or with the flag off.
+    public var walkEarned: WalkEarnedCard.Content? {
+        guard flags.walkRewards, status == .collected, let earnings else { return nil }
+        return WalkCopy.earnedCard(earnings)
     }
 
     /// After pickup: miles counted, or why none were.
