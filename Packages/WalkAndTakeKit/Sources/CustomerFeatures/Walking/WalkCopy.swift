@@ -14,6 +14,11 @@ enum WalkCopy {
         String(format: "%.\(places)f", miles)
     }
 
+    /// A milestone's mileage without a trailing ".0": "5", "15".
+    static func milestone(_ miles: Double) -> String {
+        miles == miles.rounded() ? String(format: "%.0f", miles) : self.miles(miles)
+    }
+
     /// Miles a pickup this far away would add, after the per-pickup cap.
     static func earnedMiles(forDistance distance: Double) -> Double {
         WalkRewardLadder.expectedMiles(forDistance: distance)

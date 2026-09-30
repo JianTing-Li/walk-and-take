@@ -30,6 +30,8 @@ struct ComponentRenderTests {
         ("MapBagCard", AnyView(MapBagCard(PreviewSamples.mapCard, onView: {}, onClose: {}))),
         ("WalkRewardPill", AnyView(WalkRewardPill("+0.7 mi toward a reward"))),
         ("WalkRewardCard", AnyView(WalkRewardCard(PreviewSamples.walkCard))),
+        ("WalkProgressCard", AnyView(WalkProgressCard(PreviewSamples.walkProgress))),
+        ("WalkProgressCardNew", AnyView(WalkProgressCard(PreviewSamples.walkProgressNew))),
         ("StatusBadge", AnyView(StatusBadge(text: "Ends in 12 min", isUrgent: true))),
         ("FavoriteButton", AnyView(FavoriteButton(isFavorite: true) {})),
         (

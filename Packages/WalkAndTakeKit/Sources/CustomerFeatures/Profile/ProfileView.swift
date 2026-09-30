@@ -46,6 +46,20 @@ public struct ProfileView: View {
 
     private var form: some View {
         Form {
+            if let walkProgress = model.walkProgress {
+                Section {
+                    WalkProgressCard(walkProgress)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                } header: {
+                    Text("Walking rewards")
+                } footer: {
+                    Text(
+                        "Miles count from pickups you walk to. One pickup adds up to 2 mi. Use a reward when you reserve."
+                    )
+                }
+            }
+
             if model.showsImpact {
                 Section {
                     ImpactCard(impact: model.impact)

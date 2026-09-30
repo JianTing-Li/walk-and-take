@@ -230,10 +230,12 @@ nonisolated final class FakeResetter: DemoDataResetting, Sendable {
     private let fail = Mutex(false)
     let marketplace: FakeMarketplace
     let userData: FakeUserData
+    let walkRewards: FakeWalkRewards?
 
-    init(marketplace: FakeMarketplace, userData: FakeUserData) {
+    init(marketplace: FakeMarketplace, userData: FakeUserData, walkRewards: FakeWalkRewards? = nil) {
         self.marketplace = marketplace
         self.userData = userData
+        self.walkRewards = walkRewards
     }
 
     var resetCount: Int { calls.withLock { $0 } }
@@ -249,6 +251,7 @@ nonisolated final class FakeResetter: DemoDataResetting, Sendable {
         calls.withLock { $0 += 1 }
         marketplace.clearReservations()
         userData.wipe()
+        walkRewards?.wipe()
     }
 }
 
@@ -343,7 +346,7 @@ struct Harness {
         marketplace = FakeMarketplace(offers: offers)
         userData = FakeUserData(preferences: preferences, favorites: favorites)
         clock = AdjustableClock(fixedAt: now)
-        resetter = FakeResetter(marketplace: marketplace, userData: userData)
+        resetter = FakeResetter(marketplace: marketplace, userData: userData, walkRewards: walkRewards)
         dependencies = CustomerDependencies(
             offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
             preferences: userData, walkRewards: walkRewards, walkTracker: walkTracker,
