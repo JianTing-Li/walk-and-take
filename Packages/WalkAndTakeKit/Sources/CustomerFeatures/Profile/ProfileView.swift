@@ -37,7 +37,10 @@ public struct ProfileView: View {
             }
             .navigationTitle("Profile")
             .navigationDestination(for: ProfileRoute.self) { route in
-                developerDestination?(route) ?? AnyView(EmptyView())
+                switch route {
+                case .walkHistory: WalkHistoryView(model: model.makeWalkHistory())
+                default: developerDestination?(route) ?? AnyView(EmptyView())
+                }
             }
         }
         .tint(.splashTeal)
@@ -51,6 +54,10 @@ public struct ProfileView: View {
                     WalkProgressCard(walkProgress)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
+                    NavigationLink(value: ProfileRoute.walkHistory) {
+                        Label("Walk history", systemImage: "list.bullet.rectangle")
+                    }
+                    .accessibilityIdentifier("profile.walkHistory")
                 } header: {
                     Text("Walking rewards")
                 } footer: {

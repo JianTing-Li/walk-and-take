@@ -8,6 +8,7 @@
 //    -UITestFixedLocation            use the LIC center as a device fix (no permission prompt)
 //    -UITestSeedReward               start with 1.2 walked miles and one banked 50% reward
 //    -UITestSeedMiles 4.7            like -UITestSeedReward, but with this many walked miles already
+//    -UITestSeedHistory              start with three finished walks at real restaurants (0.4, 0.9, 0.6 mi)
 //    -UITestSimulateWalk             walks use a scripted 0.5 mi walking track instead of GPS
 //    -UITestSkipSplash               start on the tabs (UI tests can't reliably wait out the animation)
 //
@@ -24,6 +25,7 @@
         var skipSplash = false
         var seedReward = false
         var seedMiles: Double?
+        var seedHistory = false
         var simulateWalk = false
 
         static var current: LaunchOptions {
@@ -39,6 +41,7 @@
                 seedMiles = Double(arguments[index + 1])
             }
             simulateWalk = arguments.contains("-UITestSimulateWalk")
+            seedHistory = arguments.contains("-UITestSeedHistory")
             if let index = arguments.firstIndex(of: "-UITestNow"), arguments.indices.contains(index + 1) {
                 fixedNow = try? Date(arguments[index + 1], strategy: .iso8601)
             }

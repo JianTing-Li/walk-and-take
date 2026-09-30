@@ -110,6 +110,9 @@ public final class ProfileModel {
         }
     }
 
+    /// The walk history screen's model.
+    func makeWalkHistory() -> WalkHistoryModel { WalkHistoryModel(dependencies: dependencies) }
+
     // MARK: - Actions
 
     public func setDietary(_ tag: DietaryTag, _ on: Bool) {

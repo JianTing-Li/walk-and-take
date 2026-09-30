@@ -21,6 +21,8 @@ public enum FavoritesRoute: Hashable, Sendable {
 }
 
 public enum ProfileRoute: Hashable, Sendable {
+    /// Every finished walk and the miles it earned.
+    case walkHistory
     /// DEBUG developer tools; the app supplies these screens.
     case timeTravel
     case seedMap
