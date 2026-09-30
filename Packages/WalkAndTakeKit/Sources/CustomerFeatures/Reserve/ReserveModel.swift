@@ -52,6 +52,8 @@ public final class ReserveModel {
     public var useReward = false
     /// The oldest unused walking reward, if the flag is on.
     public private(set) var availableReward: Reward?
+    /// How many unused walking rewards are banked.
+    public private(set) var availableRewardCount = 0
     public private(set) var unitPrice = Money.zero
 
     private let offerID: String
@@ -73,11 +75,14 @@ public final class ReserveModel {
     func refreshRewards() async {
         guard dependencies.flags.walkRewards else {
             availableReward = nil
+            availableRewardCount = 0
             useReward = false
             return
         }
         let rewards = (try? await dependencies.walkRewards.rewards()) ?? []
-        availableReward = rewards.filter(\.isAvailable).min { $0.earnedAt < $1.earnedAt }
+        let unused = rewards.filter(\.isAvailable)
+        availableRewardCount = unused.count
+        availableReward = unused.min { $0.earnedAt < $1.earnedAt }
         if availableReward == nil { useReward = false }
     }
 
@@ -114,9 +119,11 @@ public final class ReserveModel {
                 offerID: offerID, quantity: quantity, reservationID: reservationID, rewardID: rewardID, at: now)
             quantity = 1
             useReward = false
+            // Count what's left after this one before telling the customer.
+            if rewardID != nil { await refreshRewards() }
             confirmation = ReservationConfirmation(
                 reservation: reservation, now: now, showsChangePolicy: dependencies.flags.manageOrder,
-                showsWalkReminder: dependencies.flags.walkRewards)
+                showsWalkReminder: dependencies.flags.walkRewards, rewardsLeft: availableRewardCount)
         } catch let error as ReservationError {
             alert = error == .notVisibleYet ? .notOpenYet : .noLongerAvailable
         } catch {

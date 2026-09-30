@@ -341,4 +341,39 @@ struct OfferDetailModelTests {
         await reserve.reserve()
         #expect(reserve.confirmation?.walkReminderText == nil)
     }
+
+    // MARK: Reward redeemed message
+
+    func reserveWithRewards(_ rewards: [Reward]) async throws -> ReserveModel {
+        let setup = await detail()
+        setup.harness.walkRewards.seed(rewards: rewards)
+        await setup.model.load()
+        setup.model.reserve.useReward = true
+        await setup.model.reserve.reserve()
+        return setup.model.reserve
+    }
+
+    @Test func usingTheLastRewardSaysSoAndWhatItSaved() async throws {
+        let reserve = try await reserveWithRewards([Self.reward()])
+        let redeemed = try #require(reserve.confirmation?.rewardRedeemed)
+        #expect(redeemed.title == "Reward redeemed")
+        #expect(redeemed.detail == "50% off one bag saved you $2.99.")
+        #expect(redeemed.footer == "That was your last reward. Keep walking to earn the next one.")
+    }
+
+    @Test func theMessageCountsTheRewardsStillBanked() async throws {
+        let one = try await reserveWithRewards([Self.reward(), Self.reward(5)])
+        #expect(try #require(one.confirmation?.rewardRedeemed).footer == "1 more reward is ready to use.")
+        let two = try await reserveWithRewards([Self.reward(), Self.reward(5), Self.reward(15)])
+        #expect(try #require(two.confirmation?.rewardRedeemed).footer == "2 more rewards are ready to use.")
+    }
+
+    @Test func noRedeemedMessageWhenNoRewardWasUsed() async throws {
+        let setup = await detail()
+        setup.harness.walkRewards.seed(rewards: [Self.reward()])
+        await setup.model.load()
+        await setup.model.reserve.reserve()  // reward toggle left off
+        #expect(setup.model.reserve.confirmation?.rewardRedeemed == nil)
+        #expect(try await setup.harness.walkRewards.rewards().first?.isAvailable == true)
+    }
 }

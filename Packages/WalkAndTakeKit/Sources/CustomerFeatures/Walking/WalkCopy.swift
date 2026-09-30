@@ -137,4 +137,20 @@ enum WalkCopy {
                     ? "Reward unlocked: \(discount)"
                     : "\(earnings.unlockedMilestones.count) rewards unlocked: \(discount) each")
     }
+
+    // MARK: Redeemed
+
+    /// The message after a reward is used: what it saved, and how many are left.
+    static func rewardRedeemed(discount: Money, rewardsLeft: Int) -> ReservationConfirmation.RewardRedeemed {
+        let footer =
+            switch rewardsLeft {
+            case ..<1: "That was your last reward. Keep walking to earn the next one."
+            case 1: "1 more reward is ready to use."
+            default: "\(rewardsLeft) more rewards are ready to use."
+            }
+        return ReservationConfirmation.RewardRedeemed(
+            title: "Reward redeemed",
+            detail: "\(WalkRewardLadder.discountPercent)% off one bag saved you \(discount.usd).",
+            footer: footer)
+    }
 }

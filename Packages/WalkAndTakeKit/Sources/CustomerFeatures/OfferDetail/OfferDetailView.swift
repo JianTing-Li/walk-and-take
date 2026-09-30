@@ -161,6 +161,9 @@ public struct OfferDetailView: View {
                     }
                 }
                 .tint(.splashTeal)
+                // The whole row toggles, not just the small switch at its edge.
+                .contentShape(Rectangle())
+                .onTapGesture { reserve.useReward.toggle() }
                 .accessibilityIdentifier("offerDetail.useReward")
             }
             if model.canReserve {

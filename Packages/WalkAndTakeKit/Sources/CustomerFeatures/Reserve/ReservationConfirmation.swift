@@ -10,6 +10,16 @@ import Platform
 
 /// What the confirmation sheet shows, worded from the reservation's snapshot.
 public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
+    /// The success message shown when a walking reward was used on this reservation.
+    public struct RewardRedeemed: Hashable, Sendable {
+        /// "Reward redeemed"
+        public let title: String
+        /// "50% off one bag saved you $2.99."
+        public let detail: String
+        /// "1 more reward is ready to use.", or a nudge to keep walking after the last one.
+        public let footer: String
+    }
+
     public let id: UUID
     public let restaurantName: String
     public let code: String
@@ -21,12 +31,17 @@ public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
     public let totalText: String
     /// "50% off one bag: −$2.75", or nil when no reward was used.
     public let rewardText: String?
+    /// Nil when no reward was used.
+    public let rewardRedeemed: RewardRedeemed?
     /// Why the pickup must be walked to earn miles, and when Start walk opens. Nil when walking rewards are off.
     public let walkReminderText: String?
     /// "Free changes and cancellation until 9:50 AM. …", or nil when changes are off.
     public let policyText: String
 
-    init(reservation: Reservation, now: Date, showsChangePolicy: Bool, showsWalkReminder: Bool = false) {
+    init(
+        reservation: Reservation, now: Date, showsChangePolicy: Bool, showsWalkReminder: Bool = false,
+        rewardsLeft: Int = 0
+    ) {
         let snapshot = reservation.snapshot
         let calendar = NYCalendar.calendar
         id = reservation.id
@@ -40,6 +55,9 @@ public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
         rewardText =
             reservation.rewardID == nil
             ? nil : "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"
+        rewardRedeemed =
+            reservation.rewardID == nil
+            ? nil : WalkCopy.rewardRedeemed(discount: reservation.discount, rewardsLeft: rewardsLeft)
         walkReminderText =
             showsWalkReminder
             ? WalkCopy.confirmationReminder(
