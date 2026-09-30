@@ -118,7 +118,7 @@ final class AppDependencies {
                 switch route {
                 case .timeTravel: AnyView(TimeTravelView(clock: clock))
                 case .seedMap: AnyView(SeedMapView(offers: offers))
-                case .walkHistory: AnyView(EmptyView())  // Profile shows this one itself
+                case .walkHistory, .rewards: AnyView(EmptyView())  // Profile shows these itself
                 }
             }
         }
@@ -129,10 +129,9 @@ final class AppDependencies {
         /// `-UITestSeedMiles N` (one finished walk of N miles, banking whatever milestones that reaches).
         func seedDemoRewardIfRequested() async {
             let options = LaunchOptions.current
+            guard (try? await userData.walks().isEmpty) == true else { return }
             if options.seedHistory { await seedDemoHistory() }
-            guard let miles = options.seedMiles ?? (options.seedReward ? 1.2 : nil),
-                (try? await userData.walks().isEmpty) == true
-            else { return }
+            guard let miles = options.seedMiles ?? (options.seedReward ? 1.2 : nil) else { return }
             let id = UUID()
             _ = try? await userData.startWalk(reservationID: id, restaurantID: "demo", at: clock.now)
             _ = try? await userData.finishWalk(
@@ -141,9 +140,7 @@ final class AppDependencies {
 
         /// `-UITestSeedHistory`: three finished walks at real restaurants over the last two days.
         private func seedDemoHistory() async {
-            guard (try? await userData.walks().isEmpty) == true,
-                let restaurants = try? await marketplace.restaurants(), restaurants.count >= 3
-            else { return }
+            guard let restaurants = try? await marketplace.restaurants(), restaurants.count >= 3 else { return }
             let walks: [(restaurant: Restaurant, miles: Double, hoursAgo: Double)] = [
                 (restaurants[0], 0.4, 49), (restaurants[1], 0.9, 26), (restaurants[2], 0.6, 2),
             ]
