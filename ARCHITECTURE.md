@@ -42,8 +42,8 @@ Domain      ──►  Foundation only
 | Module | Holds | Default isolation |
 |---|---|---|
 | **App** | Composition root (`AppDependencies`), `AppRoot`, splash, rollover triggers, DEBUG tools | MainActor |
-| **Domain** | Plain `Sendable` models, pure business rules, repository **protocols** | nonisolated |
-| **Platform** | `Clock`, `NYCalendar`, location, notifications, pickup codes, QR codes | nonisolated |
+| **Domain** | Plain `Sendable` models, pure business rules (including walk verification and the reward ladder), repository **protocols** | nonisolated |
+| **Platform** | `Clock`, `NYCalendar`, location, walk tracking, notifications, pickup codes, QR codes | nonisolated |
 | **MockData** | SwiftData entities, seed JSON + loader, `MarketplaceStore`, `UserDataStore`, repository implementations | nonisolated |
 | **DesignSystem** | Colors, type, spacing, category/dietary styles, reusable components | MainActor |
 | **CustomerFeatures** | Screens and their view models, tab navigation | MainActor |
@@ -70,7 +70,12 @@ Hard rules:
 - **Reservation**: 4-char confirmation code, quantity, an immutable **`OfferSnapshot`** of what the customer
   saw, reserved/collected/cancelled timestamps, cancel reason, optional review. Order screens read the
   snapshot, never the live offer.
+  A reservation that used a walking reward also carries `rewardID` and a `discount` (50% of one bag), and
+  `total` is price × quantity − discount.
 - **Review**: overall, quality, value, pickup (1–5), tags, comment.
+- **Walk**: one walk per reservation: restaurant, start/finish times, credited miles, and the reason when it
+  earned nothing. **WalkSample** is one GPS fix (coordinate, time, accuracy, simulated flag).
+- **Reward**: one banked 50%-off-one-bag voucher earned at a mileage milestone; redeemed at most once.
 - **UserPreferences**: name, home area, max distance, dietary. **CommuteProfile**: leave/arrive times,
   commute days, travel mode.
 
@@ -86,6 +91,11 @@ Hard rules:
 | `PreferenceMatcher` | Within max distance of the resolved location; dietary filter when enabled. |
 | `CommuteMatcher` | Pickup window overlaps today's commute window on commute days. |
 | `PickupDayFormatter` | The single source of day-aware copy ("Today · …", "Tonight · …", "Tomorrow · …"). |
+| `WalkRewardLadder` | Reward milestones at 1, 5, 15 mi then every 10 mi; miles to the next one; progress fraction; 2 mi cap per pickup. |
+| `WalkVerifier` | Checks a GPS track: drops segments above 5 mph, rejects the walk if over 20% was too fast, ignores fixes worse than 50 m, rejects simulated fixes, requires ending within 100 m of the restaurant, caps credit at 1.25× straight-line distance and 2 mi. Also reports live progress. |
+| `WalkPolicy` | Start walk opens 1 h before the pickup window and stays available until the window closes. |
+| `WalkEstimate` | Walking time at 15 minutes per mile. |
+| `WalkEarnings` | What one finished walk added to lifetime miles, from walk history alone: miles, running total, milestones reached, and its place in the customer's credited pickups (drives the rotating catchphrase). |
 
 ---
 
@@ -103,8 +113,10 @@ Hard rules:
 - **`MarketplaceStore`** owns restaurants, offers, reservations and reviews. `reserve`, `changeQuantity`,
   `cancel`, `markCollected` and `submitReview` are atomic inside the actor and throw typed errors
   (`.soldOut`, `.windowClosed`, `.notVisibleYet`, `.invalidQuantity`, …).
-- **`UserDataStore`** owns favorites (by restaurant id), per-restaurant alert settings, preferences and the
-  commute profile.
+- **`UserDataStore`** owns favorites (by restaurant id), per-restaurant alert settings, preferences, the
+  commute profile, and walks and rewards (`WalkRewardsRepository`). Lifetime miles are the sum of credited
+  walks. A second credited pickup from the same restaurant on the same day in the customer's current time
+  zone earns no miles.
 - The stores *are* the concrete repositories (`MockData/Repositories/StoreRepositories.swift`): their
   actor methods satisfy the Domain protocols directly. `DemoDataResetter` implements `DemoDataResetting`.
 - Offer templates are read from the bundled JSON on each launch (they're immutable config); restaurants,
@@ -158,6 +170,10 @@ notifications and pops every tab to its root.
   computed from the resolved location.
 - **NotificationScheduler**: local "bags are open" alerts for favorited restaurants, identifiers
   `drop-<offerID>`, plus a preview alert.
+- **WalkTracking**: records GPS fixes per reservation (`LiveWalkTracker`, fed by `CoreLocationWalkSource`
+  using `CLLocationUpdate.liveUpdates(.fitness)` and a `CLBackgroundActivitySession`). Needs the `location`
+  background mode so a walk keeps recording with the screen locked. Verification itself is the Domain rule
+  `WalkVerifier`.
 - **PickupCodeGenerator**: 4 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 - **QRCodeGenerator**: CoreImage QR of the pickup code.
 
@@ -178,13 +194,14 @@ A compile-time `FeatureFlags` value is created in `AppDependencies` and injected
 | `reviews` | on | Rate order, ratings display |
 | `impact` | on | Impact card (Orders + Profile) |
 | `commute` | **off** | Profile "Morning commute" section and the "Fits your commute" badge |
+| `walkRewards` | on | Everything walking: distance and reward pills, walk panel, reward toggle, Start walk, Rewards and Walk history screens, Farthest sort |
 
 ---
 
 ## 7. Running tests & debug tools
 
 Everything runs from the shared **Walk_And_Take** scheme (⌘U in Xcode): the five package test targets
-(Swift Testing) plus the `WalkAndTakeUITests` happy-path UI test (XCTest).
+(Swift Testing) plus the `WalkAndTakeUITests` UI tests (XCTest): the reserve happy path and the walking-reward flow.
 
 ```sh
 xcodebuild test -project Walk_And_Take.xcodeproj -scheme Walk_And_Take \
@@ -200,8 +217,12 @@ Package tests alone (faster): `cd Packages/WalkAndTakeKit && xcodebuild test -sc
   day, and back to live. Moving the clock triggers rollover, so crossing 8 PM or midnight behaves as in real time.
 - **Seed map** shows every seed restaurant with the 1.5 mi service area; any outside it are listed in red.
 
-**DEBUG launch arguments** (used by the UI test): `-UITestInMemoryStore`, `-UITestNow <ISO 8601>` (freezes
+**DEBUG launch arguments** (used by the UI tests): `-UITestInMemoryStore`, `-UITestNow <ISO 8601>` (freezes
 the clock), `-UITestFixedLocation` (LIC center, no permission prompt), `-UITestSkipSplash`.
+
+Walking demos (DEBUG): `-UITestSeedReward` (one 1.2 mi walk, one banked reward), `-UITestSeedMiles <n>` (one walk
+of n miles), `-UITestSeedHistory` (three walks at real restaurants), `-UITestSimulateWalk` (a scripted 0.5 mi
+walk of about 24 s instead of GPS). The seed arguments combine.
 
 ---
 
@@ -220,3 +241,36 @@ the clock), `-UITestFixedLocation` (LIC center, no permission prompt), `-UITestS
    `App/FeatureFlags+Default.swift`, and hide its entry points when off. Add a test for the flag.
 6. **Wire it** — construct the model in `AppDependencies` or its parent model. Never import `MockData`
    from a feature.
+
+---
+
+## 9. Walking rewards
+
+**Journey.** Discover and the map show the walk to each bag and the miles it would add. Offer Detail adds the
+estimated time and what the customer's progress would be afterwards. Reserving can spend a banked reward (50%
+off one bag). On the order, **Start walk** appears 1 h before the pickup window and stays until it closes. While
+walking, the order shows live miles walked and miles to go. The swipe to confirm pickup ends the walk: the
+pickup is confirmed first, then the recorded track is verified and miles are credited.
+
+**Rules that matter.**
+
+- Rewards unlock at 1, 5 and 15 lifetime miles, then every 10 (25, 35, …). They bank without limit, never expire,
+  and one reservation can use one. Miles never reset.
+- One pickup adds at most 2 miles. Only the first credited pickup per restaurant per calendar day counts, using
+  the customer's current time zone (not New York).
+- A walk that fails verification still completes the pickup; it just earns 0 miles and says why.
+- A reward is claimed before the reservation is saved, and handed back if the reservation fails. Cancelling an
+  order that used one returns it.
+- After a credited pickup the order shows a "miles earned" card. Its catchphrase cycles through ten lines, one per
+  credited pickup, derived from walk history so it survives relaunch.
+
+**Known limits.**
+
+- Verification uses GPS signals only. There is no pedometer or motion-activity check, and no Apple Health.
+- Recorded fixes live in memory. If the app is killed mid-walk, recording resumes but earlier fixes are lost.
+- The live "counting so far" figure drops fast segments but doesn't judge the whole walk; the final check at
+  pickup can still reject it.
+- Everything is on device with no server, so a changed device clock or a determined spoofer isn't stopped.
+- The real `CoreLocation` tracker has been exercised only through the simulator's scripted stand-in
+  (`-UITestSimulateWalk`), not on a device.
+
