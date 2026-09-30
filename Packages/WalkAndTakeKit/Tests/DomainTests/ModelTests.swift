@@ -80,7 +80,8 @@ struct ModelTests {
     @Test func featureFlagAlertsNeedFavorites() {
         var flags = FeatureFlags(
             mapBrowse: true, favorites: true, notifications: true, dietaryFilters: true,
-            manageOrder: true, reviews: true, impact: true, commute: false
+            manageOrder: true, reviews: true, impact: true, commute: false,
+            walkRewards: true
         )
         #expect(flags.alertsEnabled)
         flags.favorites = false

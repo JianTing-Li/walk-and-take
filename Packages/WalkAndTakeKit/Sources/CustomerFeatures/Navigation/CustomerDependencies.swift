@@ -13,6 +13,7 @@ public struct CustomerDependencies: Sendable {
     public var reviews: any ReviewRepository
     public var favorites: any FavoritesRepository
     public var preferences: any PreferencesRepository
+    public var walkRewards: any WalkRewardsRepository
     public var location: any LocationProvider
     public var notifications: any NotificationScheduler
     public var resetter: any DemoDataResetting
@@ -25,6 +26,7 @@ public struct CustomerDependencies: Sendable {
         reviews: any ReviewRepository,
         favorites: any FavoritesRepository,
         preferences: any PreferencesRepository,
+        walkRewards: any WalkRewardsRepository,
         location: any LocationProvider,
         notifications: any NotificationScheduler,
         resetter: any DemoDataResetting,
@@ -36,6 +38,7 @@ public struct CustomerDependencies: Sendable {
         self.reviews = reviews
         self.favorites = favorites
         self.preferences = preferences
+        self.walkRewards = walkRewards
         self.location = location
         self.notifications = notifications
         self.resetter = resetter

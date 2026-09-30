@@ -2,7 +2,7 @@
 //  UserDataStore.swift
 //  WalkAndTakeKit
 //
-//  Owns favorites (by restaurant ID), alert settings, preferences and the commute.
+//  Owns favorites (by restaurant ID), alert settings, preferences, the commute, and walk rewards.
 //
 
 import Domain
@@ -89,6 +89,8 @@ public actor UserDataStore: ModelActor {
         try modelContext.fetch(FetchDescriptor<FavoriteEntity>()).forEach(modelContext.delete)
         try modelContext.fetch(FetchDescriptor<PreferencesEntity>()).forEach(modelContext.delete)
         try modelContext.fetch(FetchDescriptor<CommuteProfileEntity>()).forEach(modelContext.delete)
+        try modelContext.fetch(FetchDescriptor<WalkEntity>()).forEach(modelContext.delete)
+        try modelContext.fetch(FetchDescriptor<RewardEntity>()).forEach(modelContext.delete)
         try save(.reset)
     }
 
@@ -101,7 +103,7 @@ public actor UserDataStore: ModelActor {
         .first
     }
 
-    private func save(_ change: UserDataChange) throws {
+    func save(_ change: UserDataChange) throws {
         do {
             try modelContext.save()
         } catch {

@@ -92,7 +92,8 @@ final class AppDependencies {
         screens = CustomerScreens(
             dependencies: CustomerDependencies(
                 offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
-                preferences: userData, location: location, notifications: notifications, resetter: resetter,
+                preferences: userData, walkRewards: userData, location: location, notifications: notifications,
+                resetter: resetter,
                 clock: clock,
                 flags: flags),
             navigation: navigation,

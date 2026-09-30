@@ -11,6 +11,7 @@ extension EnvironmentValues {
     /// applies to previews that don't inject flags.
     @Entry public var featureFlags = FeatureFlags(
         mapBrowse: true, favorites: true, notifications: true, dietaryFilters: true,
-        manageOrder: true, reviews: true, impact: true, commute: true
+        manageOrder: true, reviews: true, impact: true, commute: true,
+        walkRewards: true
     )
 }

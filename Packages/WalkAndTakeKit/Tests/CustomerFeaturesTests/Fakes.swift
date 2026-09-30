@@ -64,6 +64,113 @@ nonisolated final class FakeUserData: FavoritesRepository, PreferencesRepository
     }
 }
 
+/// In-memory walks and rewards that follow the same rules as the real store.
+nonisolated final class FakeWalkRewards: WalkRewardsRepository, Sendable {
+    private struct State {
+        var walks: [Walk] = []
+        var rewards: [Reward] = []
+    }
+
+    private let state = Mutex(State())
+    private let broadcaster = Broadcaster<UserDataChange>()
+
+    /// Seeds lifetime miles and banked rewards for a test.
+    func seed(miles: Double = 0, rewards: [Reward] = []) {
+        state.withLock { s in
+            if miles > 0 {
+                s.walks.append(
+                    Walk(
+                        reservationID: UUID(), restaurantID: "seed", startedAt: .distantPast, finishedAt: .distantPast,
+                        creditedMiles: miles))
+            }
+            s.rewards = rewards
+        }
+    }
+
+    func walks() async throws -> [Walk] { state.withLock { $0.walks } }
+    func rewards() async throws -> [Reward] { state.withLock { $0.rewards } }
+    func totalMiles() async throws -> Double { state.withLock { $0.walks.reduce(0) { $0 + $1.creditedMiles } } }
+    func walk(reservationID: UUID) async throws -> Walk? {
+        state.withLock { $0.walks.first { $0.reservationID == reservationID } }
+    }
+
+    func startWalk(reservationID: UUID, restaurantID: String, at now: Date) async throws -> Walk {
+        let walk = state.withLock { s -> Walk in
+            if let existing = s.walks.first(where: { $0.reservationID == reservationID }) { return existing }
+            let walk = Walk(reservationID: reservationID, restaurantID: restaurantID, startedAt: now)
+            s.walks.append(walk)
+            return walk
+        }
+        broadcaster.send(.walkRewardsChanged)
+        return walk
+    }
+
+    func finishWalk(
+        reservationID: UUID, verdict: WalkVerdict, at now: Date, calendar: Calendar
+    ) async throws -> WalkCompletion {
+        let completion = try state.withLock { s -> WalkCompletion in
+            guard let index = s.walks.firstIndex(where: { $0.reservationID == reservationID }) else {
+                throw WalkRewardsError.walkNotFound
+            }
+            let before = s.walks.reduce(0) { $0 + $1.creditedMiles }
+            if s.walks[index].finishedAt != nil {
+                return WalkCompletion(walk: s.walks[index], newRewards: [], totalMiles: before)
+            }
+            var verdict = verdict
+            let restaurantID = s.walks[index].restaurantID
+            if case .credited = verdict,
+                s.walks.contains(where: {
+                    $0.restaurantID == restaurantID && $0.creditedMiles > 0
+                        && ($0.finishedAt.map { calendar.isDate($0, inSameDayAs: now) } ?? false)
+                })
+            {
+                verdict = .rejected(.repeatPickupToday)
+            }
+            s.walks[index].finishedAt = now
+            s.walks[index].creditedMiles = verdict.creditedMiles
+            if case .rejected(let reason) = verdict { s.walks[index].rejection = reason }
+            let after = before + verdict.creditedMiles
+            let rewards = WalkRewardLadder.milestonesCrossed(from: before, to: after)
+                .map { Reward(milestoneMiles: $0, earnedAt: now) }
+            s.rewards.append(contentsOf: rewards)
+            return WalkCompletion(walk: s.walks[index], newRewards: rewards, totalMiles: after)
+        }
+        broadcaster.send(.walkRewardsChanged)
+        return completion
+    }
+
+    func redeemReward(id: UUID, reservationID: UUID, at now: Date) async throws -> Reward {
+        let reward = try state.withLock { s -> Reward in
+            guard let index = s.rewards.firstIndex(where: { $0.id == id }) else {
+                throw WalkRewardsError.rewardNotFound
+            }
+            guard s.rewards[index].redeemedAt == nil else { throw WalkRewardsError.rewardAlreadyRedeemed }
+            s.rewards[index].redeemedAt = now
+            s.rewards[index].redeemedReservationID = reservationID
+            return s.rewards[index]
+        }
+        broadcaster.send(.walkRewardsChanged)
+        return reward
+    }
+
+    func releaseReward(reservationID: UUID) async throws {
+        state.withLock { s in
+            for i in s.rewards.indices where s.rewards[i].redeemedReservationID == reservationID {
+                s.rewards[i].redeemedAt = nil
+                s.rewards[i].redeemedReservationID = nil
+            }
+        }
+        broadcaster.send(.walkRewardsChanged)
+    }
+
+    func changes() -> AsyncStream<UserDataChange> { broadcaster.stream() }
+
+    func wipe() {
+        state.withLock { $0 = State() }
+        broadcaster.send(.reset)
+    }
+}
+
 /// Scripted permission answer; records previews.
 nonisolated final class FakeNotifications: NotificationScheduler, Sendable {
     private let granted = Mutex(true)
@@ -123,11 +230,13 @@ nonisolated enum Fixture {
 
     static func flags(
         mapBrowse: Bool = true, favorites: Bool = true, notifications: Bool = true, dietaryFilters: Bool = true,
-        manageOrder: Bool = true, reviews: Bool = true, impact: Bool = true, commute: Bool = false
+        manageOrder: Bool = true, reviews: Bool = true, impact: Bool = true, commute: Bool = false,
+        walkRewards: Bool = true
     ) -> FeatureFlags {
         FeatureFlags(
             mapBrowse: mapBrowse, favorites: favorites, notifications: notifications, dietaryFilters: dietaryFilters,
-            manageOrder: manageOrder, reviews: reviews, impact: impact, commute: commute)
+            manageOrder: manageOrder, reviews: reviews, impact: impact, commute: commute,
+            walkRewards: walkRewards)
     }
 
     static func restaurant(_ id: String, name: String, lat: Double, lng: Double) -> Restaurant {
@@ -179,6 +288,7 @@ nonisolated enum Fixture {
 struct Harness {
     let marketplace: FakeMarketplace
     let userData: FakeUserData
+    let walkRewards = FakeWalkRewards()
     let clock: AdjustableClock
     let notifications = FakeNotifications()
     let resetter: FakeResetter
@@ -198,7 +308,8 @@ struct Harness {
         resetter = FakeResetter(marketplace: marketplace, userData: userData)
         dependencies = CustomerDependencies(
             offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
-            preferences: userData, location: FakeLocation(result: location), notifications: notifications,
+            preferences: userData, walkRewards: walkRewards, location: FakeLocation(result: location),
+            notifications: notifications,
             resetter: resetter, clock: clock, flags: flags)
     }
 }

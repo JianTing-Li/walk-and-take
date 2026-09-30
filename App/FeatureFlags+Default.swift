@@ -16,6 +16,7 @@ extension FeatureFlags {
         manageOrder: true,
         reviews: true,
         impact: true,
-        commute: false
+        commute: false,
+        walkRewards: true
     )
 }
