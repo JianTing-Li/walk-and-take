@@ -11,6 +11,8 @@ public enum DiscoverSortOrder: String, CaseIterable, Identifiable, Sendable {
     case endingSoon = "Ending soon"
     case nearest = "Nearest"
     case cheapest = "Cheapest"
+    /// Longest walks first: the most miles toward a reward (needs walking rewards on).
+    case farthest = "Farthest"
 
     public var id: String { rawValue }
 }

@@ -118,6 +118,22 @@ struct DiscoverModelTests {
         #expect(ids().last == "bakery")
     }
 
+    @Test func farthestListsTheLongestWalksFirstAndKeepsUnavailableLast() async {
+        let (model, _) = await loaded(at: Fixture.sep(24, 8))
+        let ids = { model.sections[0].items.map { String($0.offerID.prefix { $0 != "-" }) } }
+        model.sort = .farthest
+        // Mid Deli (~0.60 mi) first; Near Café's two bags tie at ~0.23 mi, then by id; sold out last.
+        #expect(ids() == ["lunch", "breakfast", "dinner", "bakery"])
+    }
+
+    @Test func farthestIsOnlyOfferedWithWalkingRewards() async {
+        let (on, _) = await loaded(at: Fixture.sep(24, 8))
+        #expect(on.availableSorts == [.endingSoon, .nearest, .cheapest, .farthest])
+        let harness = Harness(now: Fixture.sep(24, 8), offers: Self.offers, flags: Fixture.flags(walkRewards: false))
+        let off = DiscoverModel(dependencies: harness.dependencies)
+        #expect(off.availableSorts == [.endingSoon, .nearest, .cheapest])
+    }
+
     // MARK: Preferences & header
 
     @Test func distancePreferenceHidesFartherBagsAndCountsThem() async {

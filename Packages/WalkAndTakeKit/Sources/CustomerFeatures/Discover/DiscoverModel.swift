@@ -24,6 +24,11 @@ public final class DiscoverModel {
     public var category: FoodCategory?
     public var sort: DiscoverSortOrder = .endingSoon
     public var mode: DiscoverMode = .list
+
+    /// The sort choices to offer. "Farthest" is about walking, so it needs walking rewards on.
+    public var availableSorts: [DiscoverSortOrder] {
+        DiscoverSortOrder.allCases.filter { $0 != .farthest || dependencies.flags.walkRewards }
+    }
     public private(set) var now: Date
 
     /// The map mode's model; kept in sync with the same catalog.
@@ -204,6 +209,9 @@ public final class DiscoverModel {
                 return (catalog.distanceMiles(to: a), a.id) < (catalog.distanceMiles(to: b), b.id)
             case .cheapest:
                 return (a.price.cents, a.id) < (b.price.cents, b.id)
+            case .farthest:
+                let (da, db) = (catalog.distanceMiles(to: a), catalog.distanceMiles(to: b))
+                return da != db ? da > db : a.id < b.id
             }
         }
     }
