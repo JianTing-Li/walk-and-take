@@ -19,6 +19,8 @@ public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
     public let address: String
     public let bagsText: String
     public let totalText: String
+    /// "50% off one bag: −$2.75", or nil when no reward was used.
+    public let rewardText: String?
     /// "Free changes and cancellation until 9:50 AM. …", or nil when changes are off.
     public let policyText: String
 
@@ -33,6 +35,9 @@ public struct ReservationConfirmation: Identifiable, Hashable, Sendable {
         address = snapshot.address.shortLine
         bagsText = "\(reservation.quantity) × \(snapshot.bagName)"
         totalText = reservation.total.usd
+        rewardText =
+            reservation.rewardID == nil
+            ? nil : "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"
         let findIt = "Find this order anytime in the Orders tab."
         if showsChangePolicy {
             let deadline = TimeText.time(ReservationPolicy.changeDeadline(for: reservation), calendar: calendar)

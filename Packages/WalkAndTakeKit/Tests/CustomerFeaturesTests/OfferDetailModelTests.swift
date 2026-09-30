@@ -198,4 +198,86 @@ struct OfferDetailModelTests {
     @Test func walkRewardFlagOffHidesThePanel() async {
         #expect(await detail(flags: Fixture.flags(walkRewards: false)).model.walkCard == nil)
     }
+
+    // MARK: Using a walking reward
+
+    static func reward(_ miles: Double = 1, earnedAt: Date = Fixture.sep(20, 9)) -> Reward {
+        Reward(milestoneMiles: miles, earnedAt: earnedAt)
+    }
+
+    func detailWithReward(flags: FeatureFlags = Fixture.flags()) async -> Setup {
+        let setup = await detail(flags: flags)
+        setup.harness.walkRewards.seed(rewards: [Self.reward()])
+        await setup.model.load()
+        return setup
+    }
+
+    @Test func noToggleWithoutABankedReward() async {
+        let setup = await detail()
+        #expect(!setup.model.reserve.showsRewardToggle)
+        #expect(setup.model.rewardLine == nil)
+    }
+
+    @Test func aBankedRewardShowsTheToggleAndTheDiscountBeforeConfirming() async {
+        let model = await detailWithReward().model
+        #expect(model.reserve.showsRewardToggle)
+        #expect(model.reserveButtonTitle == "Reserve · $5.99")
+        model.reserve.useReward = true
+        #expect(model.reserve.rewardDiscount == Money(cents: 299))
+        #expect(model.reserveButtonTitle == "Reserve · $3.00")
+        #expect(model.rewardLine == "50% off one bag: −$2.99")
+        model.reserve.quantity = 2
+        #expect(model.reserveButtonTitle == "Reserve · $8.99")  // 2 x $5.99 - $2.99
+    }
+
+    @Test func theReviewLineShowsTheWalkAndMilesBeforeConfirming() async {
+        let model = await detail().model
+        #expect(model.walkReviewLine == "0.2 mi walk · +0.2 mi toward a reward")
+    }
+
+    @Test func reservingWithARewardUsesItUp() async throws {
+        let setup = await detailWithReward()
+        setup.model.reserve.useReward = true
+        await setup.model.reserve.reserve()
+        let confirmation = try #require(setup.model.reserve.confirmation)
+        #expect(confirmation.rewardText == "50% off one bag: −$2.99")
+        #expect(confirmation.totalText == "$3.00")
+        let saved = try #require(try await setup.harness.marketplace.reservation(id: confirmation.id))
+        #expect(saved.rewardID != nil)
+        let rewards = try await setup.harness.walkRewards.rewards()
+        #expect(rewards.allSatisfy { !$0.isAvailable })
+        #expect(rewards.first?.redeemedReservationID == saved.id)
+        #expect(!setup.model.reserve.showsRewardToggle)
+        #expect(!setup.model.reserve.useReward)
+    }
+
+    @Test func aRewardThatWasAlreadyUsedBlocksTheReservation() async throws {
+        let setup = await detailWithReward()
+        setup.model.reserve.useReward = true
+        // Another screen spends the reward first.
+        let reward = try #require(try await setup.harness.walkRewards.rewards().first)
+        _ = try await setup.harness.walkRewards.redeemReward(
+            id: reward.id, reservationID: UUID(), at: Fixture.sep(24, 8))
+        await setup.model.reserve.reserve()
+        #expect(setup.model.reserve.alert == .rewardUnavailable)
+        #expect(setup.model.reserve.confirmation == nil)
+        #expect(setup.harness.marketplace.reservationCount == 0)
+        #expect(!setup.model.reserve.showsRewardToggle)
+    }
+
+    @Test func aFailedReservationHandsTheRewardBack() async throws {
+        let setup = await detailWithReward()
+        setup.model.reserve.useReward = true
+        setup.harness.marketplace.failNextReserve(with: ReservationError.soldOut)
+        await setup.model.reserve.reserve()
+        #expect(setup.model.reserve.alert == .noLongerAvailable)
+        #expect(try await setup.harness.walkRewards.rewards().first?.isAvailable == true)
+        #expect(setup.model.reserve.showsRewardToggle)
+    }
+
+    @Test func rewardsStayOffWhenTheFlagIsOff() async {
+        let setup = await detailWithReward(flags: Fixture.flags(walkRewards: false))
+        #expect(!setup.model.reserve.showsRewardToggle)
+        #expect(setup.model.walkReviewLine == nil)
+    }
 }

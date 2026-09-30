@@ -114,6 +114,17 @@ final class AppDependencies {
         }
     #endif
 
+    #if DEBUG
+        /// `-UITestSeedReward`: one finished 1.2 mi walk, which banks the first 50% reward.
+        func seedDemoRewardIfRequested() async {
+            guard LaunchOptions.current.seedReward, (try? await userData.rewards().isEmpty) == true else { return }
+            let id = UUID()
+            _ = try? await userData.startWalk(reservationID: id, restaurantID: "demo", at: clock.now)
+            _ = try? await userData.finishWalk(
+                reservationID: id, verdict: .credited(miles: 1.2), at: clock.now, calendar: .current)
+        }
+    #endif
+
     /// Rolls the marketplace over if the New York day (or seed) changed. Safe to call often.
     func runRollover(reason: String) async {
         do {

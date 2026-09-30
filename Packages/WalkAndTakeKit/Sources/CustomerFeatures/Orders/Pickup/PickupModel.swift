@@ -194,11 +194,15 @@ public final class PickupModel {
 
     public var summary: [(label: String, value: String)] {
         guard let reservation else { return [] }
-        return [
+        var rows = [
             ("Order", "\(reservation.quantity) × \(reservation.snapshot.bagName)"),
             ("Pickup", PickupDayFormatter.full(reservation.snapshot.pickupWindow, now: now, calendar: calendar)),
-            ("Total", reservation.total.usd),
         ]
+        if reservation.rewardID != nil {
+            rows.append(("Reward", "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"))
+        }
+        rows.append(("Total", reservation.total.usd))
+        return rows
     }
 
     private func time(_ date: Date) -> String { TimeText.time(date, calendar: calendar) }

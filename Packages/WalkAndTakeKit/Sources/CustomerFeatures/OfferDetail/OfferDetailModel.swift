@@ -54,7 +54,9 @@ public final class OfferDetailModel {
         let offers = dependencies.offers.changes()
         let userData = dependencies.favorites.changes()
         let clockChanges = dependencies.clock.changes()
+        let walkChanges = dependencies.walkRewards.changes()
         await withTaskGroup(of: Void.self) { group in
+            group.addTask { for await _ in walkChanges { await self.reserve.refreshRewards() } }
             group.addTask { for await _ in offers { await self.load() } }
             group.addTask { for await _ in userData { await self.load() } }
             group.addTask { for await _ in clockChanges { await self.load() } }
@@ -79,7 +81,8 @@ public final class OfferDetailModel {
             self.offer = offer
             self.restaurant = restaurant
             isFavorite = try await dependencies.favorites.favorites().contains { $0.restaurantID == restaurant.id }
-            reserve.update(quantityLeft: offer.quantityLeft)
+            reserve.update(quantityLeft: offer.quantityLeft, unitPrice: offer.price)
+            await reserve.refreshRewards()
             state = .loaded
         } catch {
             if state == .loading { state = .failed("Couldn't load this bag. Please try again.") }
@@ -172,10 +175,23 @@ public final class OfferDetailModel {
             footnote: WalkCopy.capNote(forDistance: distance))
     }
 
+    /// Review line above the Reserve button: "0.7 mi walk · +0.7 mi toward a reward".
+    public var walkReviewLine: String? {
+        guard flags.walkRewards, canReserve, let distance = walkDistance else { return nil }
+        return
+            "\(WalkCopy.walkTitle(forDistance: distance)) · +\(WalkCopy.miles(WalkCopy.earnedMiles(forDistance: distance))) mi toward a reward"
+    }
+
+    /// "50% off one bag: −$3.00" while the reward is switched on.
+    public var rewardLine: String? {
+        reserve.useReward && reserve.showsRewardToggle
+            ? "\(WalkRewardLadder.discountPercent)% off one bag: −\(reserve.rewardDiscount.usd)" : nil
+    }
+
     /// "Reserve · $11.98", or why you can't.
     public var reserveButtonTitle: String {
         guard let offer else { return "" }
-        if canReserve { return "Reserve · \((offer.price * reserve.quantity).usd)" }
+        if canReserve { return "Reserve · \(reserve.total.usd)" }
         if !OfferVisibility.isVisible(offer, at: now, calendar: calendar), !offer.pickupWindow.hasEnded(at: now) {
             return ReserveModel.Alert.notOpenYet.title
         }

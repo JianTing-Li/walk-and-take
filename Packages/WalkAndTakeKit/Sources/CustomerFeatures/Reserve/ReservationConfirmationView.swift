@@ -50,6 +50,9 @@ struct ReservationConfirmationView: View {
                     row("Where", confirmation.address)
                     row("How", confirmation.pickupInstructions)
                     row("Bags", confirmation.bagsText)
+                    if let rewardText = confirmation.rewardText {
+                        row("Reward", rewardText)
+                    }
                     row("Total", confirmation.totalText)
                 }
                 .padding(Spacing.l)

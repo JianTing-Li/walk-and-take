@@ -10,7 +10,10 @@ import SwiftData
 
 extension MarketplaceStore {
     /// Reserves bags if the offer is visible, open and in stock. Throws `ReservationError`.
-    public func reserve(offerID: String, quantity: Int, at now: Date) throws -> Reservation {
+    /// A reward takes 50% off one bag.
+    public func reserve(
+        offerID: String, quantity: Int, reservationID: UUID = UUID(), rewardID: UUID? = nil, at now: Date
+    ) throws -> Reservation {
         guard let offer = try offerEntity(id: offerID) else { throw ReservationError.offerNoLongerExists }
         try ReservationPolicy.validateReservation(of: offer.domain, quantity: quantity, at: now, calendar: calendar)
         guard let restaurant = try restaurantEntity(id: offer.restaurantID)?.domain else {
@@ -18,11 +21,13 @@ extension MarketplaceStore {
         }
 
         let reservation = Reservation(
-            id: UUID(),
+            id: reservationID,
             confirmationCode: codes.makeCode(),
             quantity: quantity,
             snapshot: OfferSnapshot(offer: offer.domain, restaurant: restaurant),
-            reservedAt: now
+            reservedAt: now,
+            rewardID: rewardID,
+            discount: rewardID == nil ? .zero : offer.domain.price.discount(percent: WalkRewardLadder.discountPercent)
         )
         offer.quantityReserved += quantity
         modelContext.insert(ReservationEntity(reservation))

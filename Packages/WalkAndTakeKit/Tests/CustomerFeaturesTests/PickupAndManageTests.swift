@@ -174,4 +174,21 @@ struct ManageOrderModelTests {
         #expect(!model.isOpen)
         #expect(model.deadlineNotice.title == "Changes closed at 9:50 AM")
     }
+
+    @Test func cancellingGivesBackTheRewardTheOrderUsed() async throws {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        let reward = Reward(milestoneMiles: 1, earnedAt: Fixture.sep(20, 9))
+        harness.walkRewards.seed(rewards: [reward])
+        let reservationID = UUID()
+        _ = try await harness.walkRewards.redeemReward(
+            id: reward.id, reservationID: reservationID, at: Fixture.sep(24, 7))
+        let reserved = try await harness.marketplace.reserve(
+            offerID: Self.offer.id, quantity: 1, reservationID: reservationID, rewardID: reward.id,
+            at: Fixture.sep(24, 7))
+        let model = ManageOrderModel(reservationID: reserved.id, dependencies: harness.dependencies)
+        await model.load()
+        await model.cancel()
+        #expect(model.finished)
+        #expect(try await harness.walkRewards.rewards().first?.isAvailable == true)
+    }
 }

@@ -37,6 +37,9 @@ struct AppRoot: View {
         }
         .environment(\.featureFlags, dependencies.flags)
         .task { await dependencies.runRollover(reason: "launch") }
+        #if DEBUG
+            .task { await dependencies.seedDemoRewardIfRequested() }
+        #endif
         .task { await dependencies.rollover.syncAlerts() }
         .task {
             let changes = NotificationCenter.default.notifications(

@@ -59,7 +59,9 @@ nonisolated final class FakeMarketplace: OfferRepository, ReservationRepository,
     func changes() -> AsyncStream<MarketplaceChange> { broadcaster.stream() }
 
     // ReservationRepository (filled in by later sub-phases)
-    func reserve(offerID: String, quantity: Int, at now: Date) async throws -> Reservation {
+    func reserve(offerID: String, quantity: Int, reservationID: UUID, rewardID: UUID?, at now: Date) async throws
+        -> Reservation
+    {
         let reservation = try state.withLock { s -> Reservation in
             if let error = s.nextReserveError {
                 s.nextReserveError = nil
@@ -73,8 +75,11 @@ nonisolated final class FakeMarketplace: OfferRepository, ReservationRepository,
             s.offers[index].quantityReserved += quantity
             s.codes += 1
             let reservation = Reservation(
-                id: UUID(), confirmationCode: "AB2\(s.codes)", quantity: quantity,
-                snapshot: OfferSnapshot(offer: s.offers[index], restaurant: restaurant), reservedAt: now)
+                id: reservationID, confirmationCode: "AB2\(s.codes)", quantity: quantity,
+                snapshot: OfferSnapshot(offer: s.offers[index], restaurant: restaurant), reservedAt: now,
+                rewardID: rewardID,
+                discount: rewardID == nil
+                    ? .zero : s.offers[index].price.discount(percent: WalkRewardLadder.discountPercent))
             s.reservations.append(reservation)
             return reservation
         }
