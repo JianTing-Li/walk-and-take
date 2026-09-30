@@ -41,18 +41,9 @@ struct ReservationConfirmationView: View {
                 .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
 
                 if let redeemed = confirmation.rewardRedeemed {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label(redeemed.title, systemImage: "gift.fill")
-                            .font(.headline)
-                            .foregroundStyle(.black)
-                        Text(redeemed.detail).font(.subheadline.weight(.semibold)).foregroundStyle(.black)
-                        Text(redeemed.footer).font(.footnote).foregroundStyle(.black.opacity(0.75))
-                    }
-                    .padding(Spacing.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.yolk, in: RoundedRectangle(cornerRadius: Radius.panel))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("confirmation.rewardRedeemed")
+                    RewardBanner(title: redeemed.title, detail: redeemed.detail, footer: redeemed.footer)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("confirmation.rewardRedeemed")
                 }
 
                 if let reminder = confirmation.walkReminderText {

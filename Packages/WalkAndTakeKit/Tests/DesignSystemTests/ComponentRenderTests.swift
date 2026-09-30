@@ -32,6 +32,13 @@ struct ComponentRenderTests {
         ("WalkRewardPill", AnyView(WalkRewardPill("+0.7 mi toward a reward"))),
         ("WalkRewardCard", AnyView(WalkRewardCard(PreviewSamples.walkCard))),
         ("WalkRewardCardUnlock", AnyView(WalkRewardCard(PreviewSamples.walkCardUnlock))),
+        (
+            "RewardBanner",
+            AnyView(
+                RewardBanner(
+                    title: "Reward redeemed", detail: "50% off one bag saved you $2.74.",
+                    footer: "1 more reward is ready to use.", animated: false))
+        ),
         ("WalkEarnedCard", AnyView(WalkEarnedCard(PreviewSamples.walkEarned))),
         ("WalkEarnedCardUnlock", AnyView(WalkEarnedCard(PreviewSamples.walkEarnedUnlock))),
         ("WalkProgressCard", AnyView(WalkProgressCard(PreviewSamples.walkProgress))),
