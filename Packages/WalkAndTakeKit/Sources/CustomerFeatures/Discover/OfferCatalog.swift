@@ -57,6 +57,12 @@ struct OfferCatalog: Sendable {
         String(format: "%.1f mi away", distanceMiles(to: offer))
     }
 
+    /// "+0.7 mi toward a reward", only for bags you could still reserve.
+    func walkRewardText(for offer: Offer, status: OfferAvailability.Status) -> String? {
+        guard flags.walkRewards, status.isReservable else { return nil }
+        return WalkCopy.rewardPill(forDistance: distanceMiles(to: offer))
+    }
+
     func card(for offer: Offer, at now: Date) -> BagCard.Content? {
         guard let restaurant = restaurant(for: offer) else { return nil }
         let status = OfferAvailability.status(of: offer, at: now)
@@ -74,7 +80,8 @@ struct OfferCatalog: Sendable {
             price: offer.price,
             estimatedValue: offer.estimatedValue,
             isAvailable: status.isReservable,
-            fitsCommute: fitsCommute(offer)
+            fitsCommute: fitsCommute(offer),
+            walkRewardText: walkRewardText(for: offer, status: status)
         )
     }
 }

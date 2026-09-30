@@ -209,4 +209,28 @@ struct DiscoverModelTests {
         harness.marketplace.set(offers: [])
         #expect(await eventually { model.state == .empty })
     }
+
+    // MARK: Walking rewards
+
+    @Test func cardsShowTheMilesAPickupWouldEarn() async {
+        let (model, _) = await loaded(at: Fixture.sep(24, 8))
+        let cards = Dictionary(
+            uniqueKeysWithValues: model.sections.flatMap(\.items).map { ($0.offerID.prefix { $0 != "-" }, $0.card) })
+        #expect(cards["breakfast"]?.walkRewardText == "+0.2 mi toward a reward")  // Near Café, ~0.24 mi
+        #expect(cards["lunch"]?.walkRewardText == "+0.6 mi toward a reward")  // Mid Deli, ~0.60 mi
+    }
+
+    @Test func soldOutBagsShowNoWalkReward() async {
+        let (model, _) = await loaded(at: Fixture.sep(24, 8))
+        let bakery = model.sections.flatMap(\.items).first { $0.offerID.hasPrefix("bakery") }
+        #expect(bakery?.card.walkRewardText == nil)
+    }
+
+    @Test func walkRewardFlagOffHidesThePill() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: Self.offers, flags: Fixture.flags(walkRewards: false))
+        let model = DiscoverModel(dependencies: harness.dependencies)
+        await model.load()
+        await model.resolveLocation()
+        #expect(model.sections.flatMap(\.items).allSatisfy { $0.card.walkRewardText == nil })
+    }
 }

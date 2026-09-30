@@ -28,11 +28,14 @@ public struct BagCard: View {
         /// Reservable; otherwise the card is dimmed and the discount hidden.
         public var isAvailable: Bool
         public var fitsCommute: Bool
+        /// e.g. "+0.7 mi toward a reward". Nil hides the pill (flag off or not reservable).
+        public var walkRewardText: String?
 
         public init(
             restaurantName: String, bagName: String, category: FoodCategory, badgeText: String,
             isUrgent: Bool, savingsPercent: Int, rating: Double?, reviewCount: Int, pickupText: String,
-            distanceText: String, price: Money, estimatedValue: Money, isAvailable: Bool, fitsCommute: Bool
+            distanceText: String, price: Money, estimatedValue: Money, isAvailable: Bool, fitsCommute: Bool,
+            walkRewardText: String? = nil
         ) {
             self.restaurantName = restaurantName
             self.bagName = bagName
@@ -48,6 +51,7 @@ public struct BagCard: View {
             self.estimatedValue = estimatedValue
             self.isAvailable = isAvailable
             self.fitsCommute = fitsCommute
+            self.walkRewardText = walkRewardText
         }
     }
 
@@ -113,6 +117,10 @@ public struct BagCard: View {
                     .foregroundStyle(Color.splashTeal)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.splashTeal.opacity(0.12), in: Capsule())
+            }
+
+            if let walkRewardText = content.walkRewardText, content.isAvailable {
+                WalkRewardPill(walkRewardText)
             }
 
             // Stacks vertically at large text sizes so times and prices never truncate.

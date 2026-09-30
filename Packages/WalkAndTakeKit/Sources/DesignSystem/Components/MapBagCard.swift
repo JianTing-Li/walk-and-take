@@ -18,10 +18,13 @@ public struct MapBagCard: View {
         public var price: Money
         public var estimatedValue: Money
         public var isAvailable: Bool
+        /// e.g. "+0.5 mi toward a reward". Nil hides the pill.
+        public var walkRewardText: String?
 
         public init(
             restaurantName: String, bagName: String, category: FoodCategory, statusLine: String,
-            isUrgent: Bool, price: Money, estimatedValue: Money, isAvailable: Bool
+            isUrgent: Bool, price: Money, estimatedValue: Money, isAvailable: Bool,
+            walkRewardText: String? = nil
         ) {
             self.restaurantName = restaurantName
             self.bagName = bagName
@@ -31,6 +34,7 @@ public struct MapBagCard: View {
             self.price = price
             self.estimatedValue = estimatedValue
             self.isAvailable = isAvailable
+            self.walkRewardText = walkRewardText
         }
     }
 
@@ -66,6 +70,10 @@ public struct MapBagCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
+            }
+
+            if let walkRewardText = content.walkRewardText, content.isAvailable {
+                WalkRewardPill(walkRewardText)
             }
 
             ViewThatFits(in: .horizontal) {

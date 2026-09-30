@@ -172,4 +172,30 @@ struct OfferDetailModelTests {
         await off.model.toggleFavorite()
         #expect(off.harness.userData.favoriteIDs.isEmpty)
     }
+
+    // MARK: Walking rewards
+
+    @Test func detailShowsTheWalkAndItsReward() async throws {
+        let card = try #require(await detail().model.walkCard)
+        #expect(card.title == "0.2 mi walk")
+        #expect(card.detail == "Earns +0.2 mi toward your next reward")
+        #expect(card.footnote == nil)
+    }
+
+    @Test func farWalksExplainThePerPickupCap() async throws {
+        let far = Fixture.offer("farbag", restaurant: "far", start: (7, 30), end: (10, 0))
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [far])
+        let model = OfferDetailModel(
+            offerID: far.id, origin: ResolvedLocation(coordinate: Fixture.licCenter, source: .device),
+            dependencies: harness.dependencies, navigation: CustomerNavigation())
+        await model.load()
+        let card = try #require(model.walkCard)
+        #expect(card.title == "2.1 mi walk")
+        #expect(card.detail == "Earns +2.0 mi toward your next reward")
+        #expect(card.footnote == "One pickup can add up to 2.0 mi.")
+    }
+
+    @Test func walkRewardFlagOffHidesThePanel() async {
+        #expect(await detail(flags: Fixture.flags(walkRewards: false)).model.walkCard == nil)
+    }
 }

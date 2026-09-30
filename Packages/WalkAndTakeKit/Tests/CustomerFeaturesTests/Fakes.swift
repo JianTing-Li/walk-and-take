@@ -249,7 +249,7 @@ nonisolated enum Fixture {
             rating: 4.5, reviewCount: 100)
     }
 
-    /// ~0.24 mi, ~0.54 mi, and ~2.4 mi (Midtown) from the LIC center.
+    /// ~0.23 mi, ~0.60 mi, and ~2.10 mi (Midtown) from the LIC center.
     static let restaurants = [
         restaurant("near", name: "Near Café", lat: 40.7443, lng: -73.9532),
         restaurant("mid", name: "Mid Deli", lat: 40.7497, lng: -73.9390),

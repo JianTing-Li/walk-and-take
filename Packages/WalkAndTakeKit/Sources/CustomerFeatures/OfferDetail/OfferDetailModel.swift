@@ -158,6 +158,20 @@ public final class OfferDetailModel {
         return String(format: "%.1f mi away · %@", miles, restaurant.address.neighborhood)
     }
 
+    /// Straight-line miles from where distances are measured.
+    private var walkDistance: Double? {
+        restaurant.map { PreferenceMatcher.distanceMiles(to: $0.coordinate, from: origin) }
+    }
+
+    /// The walking panel: distance and the reward progress it would earn. Nil when the flag is off.
+    public var walkCard: WalkRewardCard.Content? {
+        guard flags.walkRewards, let distance = walkDistance else { return nil }
+        return WalkRewardCard.Content(
+            title: WalkCopy.walkTitle(forDistance: distance),
+            detail: WalkCopy.earnsText(forDistance: distance),
+            footnote: WalkCopy.capNote(forDistance: distance))
+    }
+
     /// "Reserve · $11.98", or why you can't.
     public var reserveButtonTitle: String {
         guard let offer else { return "" }

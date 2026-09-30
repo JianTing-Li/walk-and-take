@@ -23,7 +23,8 @@ enum PreviewSamples {
         price: Money(cents: 599),
         estimatedValue: Money(cents: 1800),
         isAvailable: true,
-        fitsCommute: true
+        fitsCommute: true,
+        walkRewardText: "+0.2 mi toward a reward"
     )
 
     static let bagCardUrgent: BagCard.Content = {
@@ -64,6 +65,13 @@ enum PreviewSamples {
         isUrgent: true,
         price: Money(cents: 549),
         estimatedValue: Money(cents: 1500),
-        isAvailable: true
+        isAvailable: true,
+        walkRewardText: "+0.5 mi toward a reward"
+    )
+
+    static let walkCard = WalkRewardCard.Content(
+        title: "0.7 mi walk",
+        detail: "Earns +0.7 mi toward your next reward",
+        footnote: "Walk to the pickup to count your miles."
     )
 }

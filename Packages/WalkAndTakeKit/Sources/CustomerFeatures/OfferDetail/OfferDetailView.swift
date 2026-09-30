@@ -91,6 +91,10 @@ public struct OfferDetailView: View {
                     .background(
                         Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
 
+                    if let walkCard = model.walkCard {
+                        WalkRewardCard(walkCard)
+                    }
+
                     contents
                     priceRow
                 }
