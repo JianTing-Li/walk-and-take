@@ -40,6 +40,9 @@ public final class PickupModel {
     /// What a finished, credited walk added to the customer's miles. Worked out from their walk history,
     /// so it's the same right after pickup and whenever the order is opened later.
     public private(set) var earnings: WalkEarnings?
+    /// Developer mode: this walk is simulated, and whether it's walking on its own.
+    public private(set) var walkIsSimulated = false
+    public private(set) var isAutoWalking = false
     /// Progress checks in a row with no usable fix. After a few, the card suggests keeping the app open.
     private var emptyPolls = 0
     /// About 30 s of polling (every 3 s).
@@ -48,10 +51,10 @@ public final class PickupModel {
     public var rateRequest: RateRequest?
 
     private(set) var reservation: Reservation?
-    private var now: Date
-    private let reservationID: UUID
+    private(set) var now: Date
+    let reservationID: UUID
     private let origin: ResolvedLocation
-    private let dependencies: CustomerDependencies
+    let dependencies: CustomerDependencies
 
     public init(reservationID: UUID, origin: ResolvedLocation, dependencies: CustomerDependencies) {
         self.reservationID = reservationID
@@ -61,6 +64,7 @@ public final class PickupModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     private var calendar: Calendar { NYCalendar.calendar }
 
     // MARK: - Lifecycle
@@ -81,7 +85,8 @@ public final class PickupModel {
             group.addTask {
                 // The walk moves faster than the order does, so its progress refreshes more often.
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(3))
+                    // Simulated walks refresh every second so Developer mode's demo moves smoothly.
+                    try? await Task.sleep(for: .seconds(self.walkIsSimulated ? 1 : 3))
                     await self.refreshLiveProgress()
                 }
             }
@@ -146,6 +151,10 @@ public final class PickupModel {
         }
         let samples = await dependencies.walkTracker.samples(reservationID: reservationID)
         liveProgress = WalkVerifier.progress(samples: samples, destination: snapshot.coordinate)
+        if developer.isOn {
+            walkIsSimulated = await dependencies.demo.isSimulatedWalk(reservationID)
+            isAutoWalking = await dependencies.demo.isAutoWalking(reservationID)
+        }
         emptyPolls = liveProgress == nil ? emptyPolls + 1 : 0
         trackingStatus = await dependencies.walkTracker.status(reservationID: reservationID)
     }
@@ -166,7 +175,12 @@ public final class PickupModel {
 
     /// Starts recording the walk to the restaurant.
     public func startWalk() async {
-        guard canStartWalk, let snapshot = reservation?.snapshot else { return }
+        guard canStartWalk else { return }
+        await beginWalk()
+    }
+
+    func beginWalk() async {
+        guard let snapshot = reservation?.snapshot else { return }
         do {
             walk = try await dependencies.walkRewards.startWalk(
                 reservationID: reservationID, restaurantID: snapshot.restaurantID, at: dependencies.clock.now)

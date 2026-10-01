@@ -380,6 +380,27 @@ final class FakeDemoController: DemoControlling {
     func travel(to date: Date) { clock.travel(to: date) }
     func advanceTime(by interval: TimeInterval) { clock.advance(by: interval) }
     func resetTimeToLive() { clock.resetToLive() }
+
+    /// Walks the test marks as simulated, and the demo calls made on them.
+    var simulatedWalks: Set<UUID> = []
+    var autoWalking: Set<UUID> = []
+    private(set) var walkCalls: [String] = []
+
+    func isSimulatedWalk(_ id: UUID) async -> Bool { simulatedWalks.contains(id) }
+    func isAutoWalking(_ id: UUID) async -> Bool { autoWalking.contains(id) }
+    func advanceWalk(_ id: UUID, miles: Double) async {
+        walkCalls.append("advance \(miles)")
+        autoWalking.remove(id)
+    }
+    func arriveWalk(_ id: UUID) async { walkCalls.append("arrive") }
+    func autoWalk(_ id: UUID) async {
+        walkCalls.append("auto")
+        autoWalking.insert(id)
+    }
+    func pauseWalk(_ id: UUID) async {
+        walkCalls.append("pause")
+        autoWalking.remove(id)
+    }
 }
 
 /// Polls until `condition` holds (for stream-driven updates), up to ~2 s.

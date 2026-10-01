@@ -79,13 +79,17 @@ final class AppDependencies {
         #else
             location = deviceLocation
         #endif
+        // Developer mode's simulated walks start where Discover measures from.
+        let developer = developer
+        let demoWalks = DemoWalkTracker(location: location) { await developer.autoWalkSeconds }
         #if DEBUG
-            walkTracker =
-                options.simulateWalk
-                ? SimulatedWalkTracker() : LiveWalkTracker(source: CoreLocationWalkSource())
+            let forceSimulatedWalks = options.simulateWalk
         #else
-            walkTracker = LiveWalkTracker(source: CoreLocationWalkSource())
+            let forceSimulatedWalks = false
         #endif
+        walkTracker = SwitchingWalkTracker(
+            live: LiveWalkTracker(source: CoreLocationWalkSource()), demo: demoWalks
+        ) { forceSimulatedWalks ? true : await developer.usesSimulatedWalks }
         notifications = LiveNotificationScheduler()
         rollover = RolloverService(
             marketplace: marketplace, userData: userData, notifications: notifications, clock: clock,
@@ -101,7 +105,7 @@ final class AppDependencies {
                 clock: clock,
                 flags: flags,
                 developer: developer,
-                demo: DemoController(clock: clock)),
+                demo: DemoController(clock: clock, walks: demoWalks)),
             navigation: navigation)
     }
 

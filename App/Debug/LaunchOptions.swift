@@ -9,7 +9,7 @@
 //    -UITestSeedReward               start with 1.2 walked miles and one banked 50% reward
 //    -UITestSeedMiles 4.7            like -UITestSeedReward, but with this many walked miles already
 //    -UITestSeedHistory              start with three finished walks at real restaurants (0.4, 0.9, 0.6 mi)
-//    -UITestSimulateWalk             walks use a scripted 0.5 mi walking track instead of GPS
+//    -UITestSimulateWalk             walks are Developer mode's simulated walks (auto-walk to the door)
 //    -UITestSkipSplash               start on the tabs (UI tests can't reliably wait out the animation)
 //
 

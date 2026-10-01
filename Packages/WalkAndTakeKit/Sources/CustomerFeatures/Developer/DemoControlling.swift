@@ -20,4 +20,18 @@ public protocol DemoControlling: AnyObject, Sendable {
     func travel(to date: Date)
     func advanceTime(by interval: TimeInterval)
     func resetTimeToLive()
+
+    // MARK: Walks
+
+    /// This order's walk is simulated, so the demo buttons can drive it.
+    func isSimulatedWalk(_ reservationID: UUID) async -> Bool
+    /// The simulated walk is moving on its own.
+    func isAutoWalking(_ reservationID: UUID) async -> Bool
+    /// Steps the simulated walk forward (and pauses auto-walk).
+    func advanceWalk(_ reservationID: UUID, miles: Double) async
+    /// Straight to the restaurant's door.
+    func arriveWalk(_ reservationID: UUID) async
+    /// Walks the rest of the way on its own.
+    func autoWalk(_ reservationID: UUID) async
+    func pauseWalk(_ reservationID: UUID) async
 }

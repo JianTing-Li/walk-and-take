@@ -19,6 +19,9 @@ struct DeveloperSettingsTests {
         #expect(!settings.isOn)
         #expect(!settings.fixedLocation)
         #expect(!settings.usesFixedLocation)
+        #expect(settings.simulatedWalks)  // ready for the demo once Developer mode is on
+        #expect(!settings.usesSimulatedWalks)
+        #expect(settings.autoWalkSeconds == 20)
     }
 
     @Test func switchesSurviveARelaunch() {
@@ -44,9 +47,13 @@ struct DeveloperSettingsTests {
         let settings = DeveloperSettings(defaults: store)
         settings.isOn = true
         settings.fixedLocation = true
+        settings.simulatedWalks = false
+        settings.autoWalkSeconds = 60
         settings.turnOff()
         #expect(!settings.isOn)
         #expect(!settings.fixedLocation)
+        #expect(settings.simulatedWalks)
+        #expect(settings.autoWalkSeconds == 20)
         let relaunched = DeveloperSettings(defaults: store)
         #expect(!relaunched.isOn)
         #expect(!relaunched.fixedLocation)

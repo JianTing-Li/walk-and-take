@@ -328,6 +328,57 @@ struct PickupWalkingTests {
         #expect(model.liveProgress == nil)
     }
 
+    // MARK: Developer mode
+
+    @Test func noDemoControlsOutsideDeveloperMode() async {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 6))
+        #expect(model.demoWalkControls == nil)
+        #expect(!model.canOpenPickupNow)
+    }
+
+    @Test func developerModeCanStartAWalkBeforeTheUsualHour() async {
+        // 6:00: the window opens at 7:30, so the real Start walk button opens at 6:30.
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 6))
+        harness.developer.isOn = true
+        #expect(!model.canStartWalk)
+        #expect(model.demoWalkControls == .startNow)
+        await model.startWalkNow()
+        #expect(model.walk != nil)
+        #expect(harness.walkTracker.isTracking(reservation.id))
+    }
+
+    @Test func aSimulatedWalkOffersStepPauseAndArrive() async {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        harness.developer.isOn = true
+        harness.demo.simulatedWalks.insert(reservation.id)
+        harness.demo.autoWalking.insert(reservation.id)
+        harness.walkTracker.script(Array(Self.track().prefix(3)))
+        await model.startWalk()
+        #expect(model.demoWalkControls == .simulated(isAutoWalking: true, arrived: false))
+        await model.demoStep()
+        #expect(model.demoWalkControls == .simulated(isAutoWalking: false, arrived: false))
+        await model.demoToggleAutoWalk()
+        await model.demoArrive()
+        #expect(harness.demo.walkCalls == ["advance 0.1", "auto", "arrive"])
+    }
+
+    @Test func aGPSWalkCantBeDriven() async {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.developer.isOn = true
+        await model.startWalk()
+        #expect(model.demoWalkControls == .live)
+    }
+
+    @Test func openPickupNowMovesTheClockToTheWindow() async {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
+        harness.developer.isOn = true
+        #expect(model.canOpenPickupNow)
+        model.openPickupNow()
+        #expect(harness.clock.now == reservation.snapshot.pickupWindow.start)
+        model.jumpToClosing()
+        #expect(harness.clock.now == reservation.snapshot.pickupWindow.end.addingTimeInterval(-300))
+    }
+
     // MARK: Miles earned
 
     @Test func aWalkedPickupShowsTheMilesEarnedWithTheFirstCatchphrase() async throws {

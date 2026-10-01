@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 
 struct PickupView<RateSheet: View>: View {
@@ -51,6 +52,7 @@ struct PickupView<RateSheet: View>: View {
                 if let header = model.header { StatusHeader(header: header) }
 
                 if let section = model.walkSection { walkSection(section) }
+                if let controls = model.demoWalkControls { demoPanel(controls) }
 
                 if model.isActive {
                     PickupCodeCard(code: model.code)
@@ -99,6 +101,12 @@ struct PickupView<RateSheet: View>: View {
             .padding(Spacing.l)
         }
         .background(Color(.systemGroupedBackground))
+        .overlay(alignment: .bottomTrailing) {
+            if model.developer.isOn, model.isActive {
+                DemoSheetButton(title: "Demo · this order", actions: sheetActions)
+                    .padding(Spacing.l)
+            }
+        }
         .safeAreaInset(edge: .bottom) { bottomBar }
     }
 
@@ -130,6 +138,57 @@ struct PickupView<RateSheet: View>: View {
         case .walking(let walking):
             WalkingCard(walking: walking)
         }
+    }
+
+    // MARK: Developer mode
+
+    private func demoPanel(_ controls: PickupModel.DemoWalkControls) -> some View {
+        switch controls {
+        case .startNow:
+            DemoPanel(note: "Skip the wait for Start walk", actions: [startNowAction])
+        case .simulated(let isAutoWalking, let arrived):
+            DemoPanel(
+                note: arrived ? "Simulated walk · at the door" : "Simulated walk",
+                actions: arrived ? [] : walkActions(isAutoWalking))
+        case .live:
+            DemoPanel(
+                note: "This walk uses GPS. Turn on Simulated walks in Profile to drive the next one.", actions: [])
+        }
+    }
+
+    private var startNowAction: DemoAction {
+        DemoAction("Start walk now", systemImage: "figure.walk") { Task { await model.startWalkNow() } }
+    }
+
+    private func walkActions(_ isAutoWalking: Bool) -> [DemoAction] {
+        [
+            DemoAction("+0.1 mi", systemImage: "plus") { Task { await model.demoStep() } },
+            isAutoWalking
+                ? DemoAction("Pause", systemImage: "pause.fill") { Task { await model.demoToggleAutoWalk() } }
+                : DemoAction("Auto-walk", systemImage: "play.fill") { Task { await model.demoToggleAutoWalk() } },
+            DemoAction("Arrive now", systemImage: "flag.checkered") { Task { await model.demoArrive() } },
+        ]
+    }
+
+    /// Everything the demo can do on this order, for the floating Demo sheet.
+    private var sheetActions: [DemoAction] {
+        var actions: [DemoAction] = []
+        if model.canOpenPickupNow {
+            actions.append(
+                DemoAction("Open pickup now", systemImage: "clock.badge.checkmark") { model.openPickupNow() })
+        }
+        if model.canJumpToClosing {
+            actions.append(
+                DemoAction("Jump to 5 min before pickup ends", systemImage: "hourglass.bottomhalf.filled") {
+                    model.jumpToClosing()
+                })
+        }
+        switch model.demoWalkControls {
+        case .startNow: actions.append(startNowAction)
+        case .simulated(let isAutoWalking, false): actions += walkActions(isAutoWalking)
+        default: break
+        }
+        return actions
     }
 
     @ViewBuilder

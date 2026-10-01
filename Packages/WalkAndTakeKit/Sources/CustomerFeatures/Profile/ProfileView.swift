@@ -142,6 +142,17 @@ public struct ProfileView: View {
                     Label("Fixed location", systemImage: "location.fill")
                 }
                 .accessibilityIdentifier("developer.fixedLocation")
+                Toggle(isOn: Bindable(model.developer).simulatedWalks) {
+                    Label("Simulated walks", systemImage: "figure.walk.motion")
+                }
+                .accessibilityIdentifier("developer.simulatedWalks")
+                if model.developer.simulatedWalks {
+                    Picker(selection: Bindable(model.developer).autoWalkSeconds) {
+                        ForEach(DeveloperSettings.autoWalkOptions, id: \.self) { Text("\($0) s").tag($0) }
+                    } label: {
+                        Label("Auto-walk takes", systemImage: "timer")
+                    }
+                }
                 NavigationLink(value: ProfileRoute.timeTravel) {
                     Label("Time travel", systemImage: "clock.arrow.2.circlepath")
                 }
@@ -155,7 +166,9 @@ public struct ProfileView: View {
         } footer: {
             Text(
                 model.developer.isOn
-                    ? "Fixed location puts you at the center of Long Island City. Reset demo data starts over "
+                    ? "Fixed location puts you at the center of Long Island City. Simulated walks follow a "
+                        + "straight route to the store that you can step, pause or finish from the order screen. "
+                        + "Reset demo data starts over "
                         + "with fresh bags from every store. Turning Developer mode off puts every setting here "
                         + "back to normal."
                     : "Shows demo tools for walking through the app: time travel, a fixed location and demo data.")

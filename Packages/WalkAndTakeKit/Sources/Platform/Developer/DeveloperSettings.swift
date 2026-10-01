@@ -32,6 +32,22 @@ public final class DeveloperSettings {
     /// Fixed location is in effect (both switches on).
     public var usesFixedLocation: Bool { isOn && fixedLocation }
 
+    /// Walks follow a scripted route instead of GPS, driven by the demo controls. Applies only while `isOn`.
+    public var simulatedWalks: Bool {
+        didSet { defaults.set(simulatedWalks, forKey: Key.simulatedWalks) }
+    }
+
+    /// Seconds a simulated walk takes to reach the door on its own.
+    public var autoWalkSeconds: Int {
+        didSet { defaults.set(autoWalkSeconds, forKey: Key.autoWalkSeconds) }
+    }
+
+    public static let autoWalkOptions = [10, 20, 60]
+    public static let defaultAutoWalkSeconds = 20
+
+    /// New walks are simulated (both switches on).
+    public var usesSimulatedWalks: Bool { isOn && simulatedWalks }
+
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let locationBroadcaster = Broadcaster<Void>()
 
@@ -39,12 +55,16 @@ public final class DeveloperSettings {
         self.defaults = defaults
         isOn = defaults.bool(forKey: Key.isOn)
         fixedLocation = defaults.bool(forKey: Key.fixedLocation)
+        simulatedWalks = defaults.object(forKey: Key.simulatedWalks) as? Bool ?? true
+        autoWalkSeconds = defaults.object(forKey: Key.autoWalkSeconds) as? Int ?? Self.defaultAutoWalkSeconds
     }
 
     /// Developer mode off, and every setting under it back to its default.
     public func turnOff() {
         isOn = false
         fixedLocation = false
+        simulatedWalks = true
+        autoWalkSeconds = Self.defaultAutoWalkSeconds
     }
 
     /// Yields when the location in effect changes, so screens can resolve it again.
@@ -55,5 +75,7 @@ public final class DeveloperSettings {
     private enum Key {
         static let isOn = "developer.isOn"
         static let fixedLocation = "developer.fixedLocation"
+        static let simulatedWalks = "developer.simulatedWalks"
+        static let autoWalkSeconds = "developer.autoWalkSeconds"
     }
 }
