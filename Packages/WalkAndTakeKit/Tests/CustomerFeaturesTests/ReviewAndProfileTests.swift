@@ -237,6 +237,45 @@ struct ProfileModelTests {
         #expect(model.availableRewards == 0)
     }
 
+    // MARK: Developer mode: rewards
+
+    @Test func demoMilesMoveTheBarAndCrossingAMilestoneCelebrates() async {
+        let (model, _) = await profileWithWalks(miles: 0.6)
+        await model.demoAddMiles(0.2)
+        #expect(abs(model.walkMiles - 0.8) < 1e-9)
+        #expect(model.rewardUnlock == nil)
+        await model.demoAddMiles(0.5)  // past 1 mi
+        #expect(model.availableRewards == 1)
+        #expect(model.rewardUnlock?.title == "Reward unlocked")
+        #expect(model.rewardUnlock?.detail == "50% off one bag is ready to use.")
+    }
+
+    @Test func completingTheMilestoneLandsExactlyOnIt() async throws {
+        let (model, harness) = await profileWithWalks(miles: 1.2, rewards: [Self.reward()])
+        await model.demoCompleteMilestone()
+        #expect(abs(model.walkMiles - 5) < 0.001)
+        #expect(try await harness.walkRewards.rewards().map(\.milestoneMiles) == [1, 5])
+        let card = try #require(model.walkProgress)
+        #expect(card.targetTitle == "Next: 50% off one bag at 15 mi")
+        #expect(model.rewardUnlock != nil)
+    }
+
+    @Test func aGrantedRewardLooksEarnedButLeavesMilesAlone() async throws {
+        let (model, harness) = await profileWithWalks(miles: 1.2, rewards: [Self.reward()])
+        await model.demoGrantReward()
+        #expect(abs(model.walkMiles - 1.2) < 1e-9)
+        #expect(model.availableRewards == 2)
+        #expect(try await harness.walkRewards.rewards().last?.milestoneMiles == 5)  // the next milestone
+        #expect(model.rewardUnlock?.title == "Reward added")
+    }
+
+    @Test func clearingStartsWalkingRewardsOver() async {
+        let (model, _) = await profileWithWalks(miles: 6, rewards: [Self.reward(), Self.reward(at: 5)])
+        await model.demoClearWalksAndRewards()
+        #expect(model.walkMiles == 0)
+        #expect(model.availableRewards == 0)
+    }
+
     @Test func walkProgressFollowsTheFlag() async {
         let (model, _) = await profileWithWalks(miles: 2, flags: Fixture.flags(walkRewards: false))
         #expect(!model.showsWalkProgress)

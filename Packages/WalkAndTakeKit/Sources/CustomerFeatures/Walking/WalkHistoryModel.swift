@@ -76,7 +76,7 @@ public final class WalkHistoryModel {
             let earnings = WalkEarnings.of(walk, in: walks)
             return Row(
                 id: walk.id,
-                title: names[walk.restaurantID] ?? "Walk & Take pickup",
+                title: walk.isDemo ? "Demo walk" : names[walk.restaurantID] ?? "Walk & Take pickup",
                 dateText:
                     "\(TimeText.shortDate(finishedAt, calendar: calendar)) · \(TimeText.time(finishedAt, calendar: calendar))",
                 milesText: walk.creditedMiles > 0 ? "+\(WalkCopy.miles(walk.creditedMiles)) mi" : "0 mi",

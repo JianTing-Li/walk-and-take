@@ -6,6 +6,7 @@
 //  with the concrete clock and stores, so features never reach past their repository protocols.
 //
 
+import Domain
 import Foundation
 
 @MainActor
@@ -34,4 +35,15 @@ public protocol DemoControlling: AnyObject, Sendable {
     /// Walks the rest of the way on its own.
     func autoWalk(_ reservationID: UUID) async
     func pauseWalk(_ reservationID: UUID) async
+
+    // MARK: Rewards
+
+    /// Adds miles as a finished "Demo walk". Returns the rewards banked by crossing milestones.
+    func addMiles(_ miles: Double) async -> [Reward]
+    /// Adds exactly the miles left to the next milestone, banking its reward.
+    func completeNextMilestone() async -> [Reward]
+    /// Banks one reward without changing miles.
+    func grantReward() async -> Reward?
+    /// Back to zero miles and no rewards (orders and bags stay).
+    func clearWalksAndRewards() async
 }

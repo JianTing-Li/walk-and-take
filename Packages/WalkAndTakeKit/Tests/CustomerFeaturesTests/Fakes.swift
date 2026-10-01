@@ -190,6 +190,23 @@ nonisolated final class FakeWalkRewards: WalkRewardsRepository, Sendable {
         return reward
     }
 
+    /// Developer mode: a reward without miles.
+    func bank(milestoneMiles: Double, at now: Date) -> Reward {
+        let reward = Reward(milestoneMiles: milestoneMiles, earnedAt: now)
+        state.withLock { $0.rewards.append(reward) }
+        broadcaster.send(.walkRewardsChanged)
+        return reward
+    }
+
+    /// Developer mode: finished walks and every reward gone.
+    func clear() {
+        state.withLock { s in
+            s.walks.removeAll { $0.finishedAt != nil }
+            s.rewards.removeAll()
+        }
+        broadcaster.send(.walkRewardsChanged)
+    }
+
     func releaseReward(reservationID: UUID) async throws {
         state.withLock { s in
             for i in s.rewards.indices where s.rewards[i].redeemedReservationID == reservationID {
@@ -351,6 +368,7 @@ struct Harness {
         resetter = FakeResetter(marketplace: marketplace, userData: userData, walkRewards: walkRewards)
         developer = DeveloperSettings(defaults: freshDefaults())
         demo = FakeDemoController(clock: clock)
+        demo.walkRewards = walkRewards
         dependencies = CustomerDependencies(
             offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
             preferences: userData, walkRewards: walkRewards, walkTracker: walkTracker,
@@ -401,6 +419,31 @@ final class FakeDemoController: DemoControlling {
         walkCalls.append("pause")
         autoWalking.remove(id)
     }
+
+    /// Rewards actions go to the fake walk rewards, through the same rules as the real store.
+    var walkRewards: FakeWalkRewards?
+
+    func addMiles(_ miles: Double) async -> [Reward] {
+        guard let walkRewards else { return [] }
+        let id = UUID()
+        _ = try? await walkRewards.startWalk(reservationID: id, restaurantID: "demo-\(id)", at: clock.now)
+        return
+            (try? await walkRewards.finishWalk(
+                reservationID: id, verdict: .credited(miles: miles), at: clock.now, calendar: .current))?.newRewards
+            ?? []
+    }
+
+    func completeNextMilestone() async -> [Reward] {
+        let total = (try? await walkRewards?.totalMiles()) ?? 0
+        return await addMiles(WalkRewardLadder.milesToNext(totalMiles: total) + 1e-6)
+    }
+
+    func grantReward() async -> Reward? {
+        let total = (try? await walkRewards?.totalMiles()) ?? 0
+        return walkRewards?.bank(milestoneMiles: WalkRewardLadder.nextMilestone(after: total), at: clock.now)
+    }
+
+    func clearWalksAndRewards() async { walkRewards?.clear() }
 }
 
 /// Polls until `condition` holds (for stream-driven updates), up to ~2 s.

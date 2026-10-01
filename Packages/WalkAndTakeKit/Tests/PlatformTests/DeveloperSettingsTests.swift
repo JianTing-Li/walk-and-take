@@ -22,6 +22,8 @@ struct DeveloperSettingsTests {
         #expect(settings.simulatedWalks)  // ready for the demo once Developer mode is on
         #expect(!settings.usesSimulatedWalks)
         #expect(settings.autoWalkSeconds == 20)
+        #expect(settings.showsDemoControls)
+        #expect(!settings.usesDemoControls)
     }
 
     @Test func switchesSurviveARelaunch() {
@@ -49,14 +51,25 @@ struct DeveloperSettingsTests {
         settings.fixedLocation = true
         settings.simulatedWalks = false
         settings.autoWalkSeconds = 60
+        settings.showsDemoControls = false
         settings.turnOff()
         #expect(!settings.isOn)
         #expect(!settings.fixedLocation)
         #expect(settings.simulatedWalks)
         #expect(settings.autoWalkSeconds == 20)
+        #expect(settings.showsDemoControls)
         let relaunched = DeveloperSettings(defaults: store)
         #expect(!relaunched.isOn)
         #expect(!relaunched.fixedLocation)
+    }
+
+    @Test func demoControlsHideWithoutTouchingTheOtherSettings() {
+        let settings = DeveloperSettings(defaults: defaults())
+        settings.isOn = true
+        #expect(settings.usesDemoControls)
+        settings.showsDemoControls = false
+        #expect(!settings.usesDemoControls)
+        #expect(settings.usesSimulatedWalks)
     }
 
     @Test func theLocationProviderFollowsTheSwitch() async {

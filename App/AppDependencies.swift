@@ -105,7 +105,7 @@ final class AppDependencies {
                 clock: clock,
                 flags: flags,
                 developer: developer,
-                demo: DemoController(clock: clock, walks: demoWalks)),
+                demo: DemoController(clock: clock, walks: demoWalks, userData: userData)),
             navigation: navigation)
     }
 

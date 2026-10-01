@@ -52,7 +52,6 @@ struct PickupView<RateSheet: View>: View {
                 if let header = model.header { StatusHeader(header: header) }
 
                 if let section = model.walkSection { walkSection(section) }
-                if let controls = model.demoWalkControls { demoPanel(controls) }
 
                 if model.isActive {
                     PickupCodeCard(code: model.code)
@@ -102,8 +101,8 @@ struct PickupView<RateSheet: View>: View {
         }
         .background(Color(.systemGroupedBackground))
         .overlay(alignment: .bottomTrailing) {
-            if model.developer.isOn, model.isActive {
-                DemoSheetButton(title: "Demo · this order", actions: sheetActions)
+            if model.developer.usesDemoControls, model.isActive {
+                DemoMenuButton(title: "Demo · this order", actions: demoActions)
                     .padding(Spacing.l)
             }
         }
@@ -142,20 +141,6 @@ struct PickupView<RateSheet: View>: View {
 
     // MARK: Developer mode
 
-    private func demoPanel(_ controls: PickupModel.DemoWalkControls) -> some View {
-        switch controls {
-        case .startNow:
-            DemoPanel(note: "Skip the wait for Start walk", actions: [startNowAction])
-        case .simulated(let isAutoWalking, let arrived):
-            DemoPanel(
-                note: arrived ? "Simulated walk · at the door" : "Simulated walk",
-                actions: arrived ? [] : walkActions(isAutoWalking))
-        case .live:
-            DemoPanel(
-                note: "This walk uses GPS. Turn on Simulated walks in Profile to drive the next one.", actions: [])
-        }
-    }
-
     private var startNowAction: DemoAction {
         DemoAction("Start walk now", systemImage: "figure.walk") { Task { await model.startWalkNow() } }
     }
@@ -170,9 +155,14 @@ struct PickupView<RateSheet: View>: View {
         ]
     }
 
-    /// Everything the demo can do on this order, for the floating Demo sheet.
-    private var sheetActions: [DemoAction] {
+    /// What the Demo button can do on this order right now: the walk first, then the clock.
+    private var demoActions: [DemoAction] {
         var actions: [DemoAction] = []
+        switch model.demoWalkControls {
+        case .startNow: actions.append(startNowAction)
+        case .simulated(let isAutoWalking, false): actions += walkActions(isAutoWalking)
+        default: break
+        }
         if model.canOpenPickupNow {
             actions.append(
                 DemoAction("Open pickup now", systemImage: "clock.badge.checkmark") { model.openPickupNow() })
@@ -182,11 +172,6 @@ struct PickupView<RateSheet: View>: View {
                 DemoAction("Jump to 5 min before pickup ends", systemImage: "hourglass.bottomhalf.filled") {
                     model.jumpToClosing()
                 })
-        }
-        switch model.demoWalkControls {
-        case .startNow: actions.append(startNowAction)
-        case .simulated(let isAutoWalking, false): actions += walkActions(isAutoWalking)
-        default: break
         }
         return actions
     }

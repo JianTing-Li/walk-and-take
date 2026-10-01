@@ -47,6 +47,15 @@ public struct ProfileView: View {
     private var form: some View {
         Form {
             if let walkProgress = model.walkProgress {
+                if let unlock = model.rewardUnlock {
+                    Section {
+                        RewardBanner(title: unlock.title, detail: unlock.detail, footer: unlock.footer)
+                            .id(unlock.id)  // a new unlock plays the animation again
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                            .accessibilityIdentifier("profile.rewardUnlocked")
+                    }
+                }
                 Section {
                     WalkProgressCard(walkProgress) { navigation.profilePath.append(.rewards) }
                         .listRowInsets(EdgeInsets())
@@ -106,6 +115,34 @@ public struct ProfileView: View {
             if model.showsCommute { CommuteSection(model: model) }
             developerSection
         }
+        .animation(.spring(duration: 0.4), value: model.rewardUnlock)
+        .overlay(alignment: .bottomTrailing) {
+            if model.developer.usesDemoControls, model.showsWalkProgress {
+                DemoMenuButton(title: "Demo · walking rewards", actions: rewardActions)
+                    .padding(Spacing.l)
+            }
+        }
+        .confirmationDialog(
+            "Clear all walks and rewards?", isPresented: $model.confirmingClearRewards, titleVisibility: .visible
+        ) {
+            Button("Clear", role: .destructive) { Task { await model.demoClearWalksAndRewards() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Miles go back to zero and every reward is removed. Orders and bags stay.")
+        }
+    }
+
+    // MARK: Developer mode: rewards
+
+    private var rewardActions: [DemoAction] {
+        [
+            DemoAction("+0.5 mi", systemImage: "plus") { Task { await model.demoAddMiles(0.5) } },
+            DemoAction("+1 mi", systemImage: "plus") { Task { await model.demoAddMiles(1) } },
+            DemoAction("Complete milestone", systemImage: "flag.checkered") {
+                Task { await model.demoCompleteMilestone() }
+            },
+            DemoAction("Grant a reward", systemImage: "gift") { Task { await model.demoGrantReward() } },
+        ]
     }
 
     private var dietarySection: some View {
@@ -138,6 +175,10 @@ public struct ProfileView: View {
             }
             .accessibilityIdentifier("profile.developerMode")
             if model.developer.isOn {
+                Toggle(isOn: Bindable(model.developer).showsDemoControls) {
+                    Label("Show demo controls", systemImage: "wand.and.stars")
+                }
+                .accessibilityIdentifier("developer.showsDemoControls")
                 Toggle(isOn: Bindable(model.developer).fixedLocation) {
                     Label("Fixed location", systemImage: "location.fill")
                 }
@@ -159,6 +200,12 @@ public struct ProfileView: View {
                 NavigationLink(value: ProfileRoute.seedMap) {
                     Label("Seed map", systemImage: "map")
                 }
+                Button(role: .destructive) {
+                    model.confirmingClearRewards = true
+                } label: {
+                    Label("Clear walks & rewards", systemImage: "figure.walk.departure")
+                }
+                .accessibilityIdentifier("developer.clearWalksAndRewards")
                 resetButton
             }
         } header: {
@@ -166,11 +213,11 @@ public struct ProfileView: View {
         } footer: {
             Text(
                 model.developer.isOn
-                    ? "Fixed location puts you at the center of Long Island City. Simulated walks follow a "
-                        + "straight route to the store that you can step, pause or finish from the order screen. "
-                        + "Reset demo data starts over "
-                        + "with fresh bags from every store. Turning Developer mode off puts every setting here "
-                        + "back to normal."
+                    ? "The Demo button on Profile and on orders steps walks, adds miles and unlocks rewards. "
+                        + "Fixed location puts you at the center of Long Island City. Simulated walks follow a "
+                        + "straight route to the store. Clear walks & rewards zeroes your miles and rewards; "
+                        + "Reset demo data starts the whole app over. Turning Developer mode off puts every "
+                        + "setting here back to normal."
                     : "Shows demo tools for walking through the app: time travel, a fixed location and demo data.")
         }
     }

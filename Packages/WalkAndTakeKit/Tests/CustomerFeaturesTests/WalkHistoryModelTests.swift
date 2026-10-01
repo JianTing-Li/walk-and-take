@@ -45,6 +45,14 @@ struct WalkHistoryModelTests {
         #expect(model.summaryText == "0 walked pickups · 0.0 mi counted")
     }
 
+    @Test func developerModeMilesShowAsADemoWalk() async {
+        let harness = Harness(now: Fixture.sep(24, 12), offers: [Self.offer])
+        _ = await harness.demo.addMiles(1)
+        let model = await model(harness)
+        #expect(model.rows.map(\.title) == ["Demo walk"])
+        #expect(model.rows[0].milesText == "+1.0 mi")
+    }
+
     @Test func listsWalksNewestFirstWithRestaurantDateAndMiles() async throws {
         let harness = Harness(now: Fixture.sep(24, 12), offers: [Self.offer])
         try await walk(harness, restaurant: "near", miles: 0.23, finished: Fixture.sep(22, 8))

@@ -29,6 +29,15 @@ public final class DeveloperSettings {
         }
     }
 
+    /// Shows the floating Demo button on screens. Off keeps every screen exactly as customers see it,
+    /// while the other settings keep working. Applies only while `isOn`.
+    public var showsDemoControls: Bool {
+        didSet { defaults.set(showsDemoControls, forKey: Key.showsDemoControls) }
+    }
+
+    /// The Demo button is showing (both switches on).
+    public var usesDemoControls: Bool { isOn && showsDemoControls }
+
     /// Fixed location is in effect (both switches on).
     public var usesFixedLocation: Bool { isOn && fixedLocation }
 
@@ -55,6 +64,7 @@ public final class DeveloperSettings {
         self.defaults = defaults
         isOn = defaults.bool(forKey: Key.isOn)
         fixedLocation = defaults.bool(forKey: Key.fixedLocation)
+        showsDemoControls = defaults.object(forKey: Key.showsDemoControls) as? Bool ?? true
         simulatedWalks = defaults.object(forKey: Key.simulatedWalks) as? Bool ?? true
         autoWalkSeconds = defaults.object(forKey: Key.autoWalkSeconds) as? Int ?? Self.defaultAutoWalkSeconds
     }
@@ -63,6 +73,7 @@ public final class DeveloperSettings {
     public func turnOff() {
         isOn = false
         fixedLocation = false
+        showsDemoControls = true
         simulatedWalks = true
         autoWalkSeconds = Self.defaultAutoWalkSeconds
     }
@@ -75,6 +86,7 @@ public final class DeveloperSettings {
     private enum Key {
         static let isOn = "developer.isOn"
         static let fixedLocation = "developer.fixedLocation"
+        static let showsDemoControls = "developer.showsDemoControls"
         static let simulatedWalks = "developer.simulatedWalks"
         static let autoWalkSeconds = "developer.autoWalkSeconds"
     }
