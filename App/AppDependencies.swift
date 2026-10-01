@@ -70,8 +70,10 @@ final class AppDependencies {
             fatalError("Walk & Take can't start without its seed data and store: \(error)")
         }
 
-        marketplace = MarketplaceStore(modelContainer: container, seed: seed)
-        userData = UserDataStore(modelContainer: container)
+        // One feed for both stores: rewards the marketplace spends or returns reach the screens listening to userData.
+        let rewardChanges = Broadcaster<UserDataChange>()
+        marketplace = MarketplaceStore(modelContainer: container, seed: seed, rewardChanges: rewardChanges)
+        userData = UserDataStore(modelContainer: container, changes: rewardChanges)
         let deviceLocation = DeveloperLocationProvider(
             device: DeviceLocationProvider(source: CoreLocationSource()), settings: developer)
         #if DEBUG
@@ -88,7 +90,7 @@ final class AppDependencies {
             let forceSimulatedWalks = false
         #endif
         walkTracker = SwitchingWalkTracker(
-            live: LiveWalkTracker(source: CoreLocationWalkSource()), demo: demoWalks
+            live: LiveWalkTracker(source: CoreLocationWalkSource(), store: userData), demo: demoWalks
         ) { forceSimulatedWalks ? true : await developer.usesSimulatedWalks }
         notifications = LiveNotificationScheduler()
         rollover = RolloverService(

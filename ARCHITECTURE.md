@@ -261,15 +261,20 @@ pickup is confirmed first, then the recorded track is verified and miles are cre
 - One pickup adds at most 2 miles. Only the first credited pickup per restaurant per calendar day counts, using
   the customer's current time zone (not New York).
 - A walk that fails verification still completes the pickup; it just earns 0 miles and says why.
-- A reward is claimed before the reservation is saved, and handed back if the reservation fails. Cancelling an
-  order that used one returns it.
+- A reward is spent in the same save as the reservation that uses it (`MarketplaceStore.reserve`), so either both
+  happen or neither does. A refused reservation, or a reward that is missing or already used
+  (`ReservationError.rewardUnavailable`), changes nothing. Cancelling an order gives its reward back in the same
+  save as the cancellation. Both stores share one change feed so the other screens hear about it.
 - After a credited pickup the order shows a "miles earned" card. Its catchphrase cycles through ten lines, one per
   credited pickup, derived from walk history so it survives relaunch.
 
 **Known limits.**
 
 - Verification uses GPS signals only. There is no pedometer or motion-activity check, and no Apple Health.
-- Recorded fixes live in memory. If the app is killed mid-walk, recording resumes but earlier fixes are lost.
+- GPS fixes are saved to disk in small batches (every 5 fixes or 5 s of walking, and when the walk ends), so a
+  kill loses at most the last few seconds. Recording resumes with the saved fixes, and a walk confirmed but not yet
+  credited when the app died is credited from them the next time the order opens. Saved fixes are removed once the
+  walk is credited or the order is cancelled or missed.
 - Live progress drops fast segments but doesn't judge the whole walk; the final check at pickup can still
   reject it.
 - Everything is on device with no server, so a changed device clock or a determined spoofer isn't stopped.

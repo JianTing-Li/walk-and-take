@@ -33,10 +33,13 @@ enum TestEnv {
     /// Fresh in-memory stores sharing one container, rolled over at `now` if given.
     static func makeStores(seed: Seed = seed, rolloverAt now: Date? = nil) async throws -> Stores {
         let container = try ModelContainerFactory.makeInMemory()
+        // One feed for both, as in the app: rewards the marketplace spends or returns reach userData's listeners.
+        let rewardChanges = Broadcaster<UserDataChange>()
         let stores = Stores(
             container: container,
-            marketplace: MarketplaceStore(modelContainer: container, seed: seed, codes: SequentialCodes()),
-            userData: UserDataStore(modelContainer: container)
+            marketplace: MarketplaceStore(
+                modelContainer: container, seed: seed, codes: SequentialCodes(), rewardChanges: rewardChanges),
+            userData: UserDataStore(modelContainer: container, changes: rewardChanges)
         )
         if let now { try await stores.marketplace.rolloverIfNeeded(at: now) }
         return stores

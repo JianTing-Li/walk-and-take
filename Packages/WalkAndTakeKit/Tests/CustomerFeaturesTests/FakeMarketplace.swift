@@ -26,8 +26,12 @@ nonisolated final class FakeMarketplace: OfferRepository, ReservationRepository,
     private let state: Mutex<State>
     private let broadcaster = Broadcaster<MarketplaceChange>()
 
-    init(offers: [Offer] = [], restaurants: [Restaurant] = Fixture.restaurants) {
+    /// The rewards a reservation can spend or give back; nil means rewards aren't part of the test.
+    private let rewards: FakeWalkRewards?
+
+    init(offers: [Offer] = [], restaurants: [Restaurant] = Fixture.restaurants, rewards: FakeWalkRewards? = nil) {
         state = Mutex(State(offers: offers, restaurants: restaurants))
+        self.rewards = rewards
     }
 
     func set(offers: [Offer]) {
@@ -72,6 +76,12 @@ nonisolated final class FakeMarketplace: OfferRepository, ReservationRepository,
             else { throw ReservationError.offerNoLongerExists }
             try ReservationPolicy.validateReservation(
                 of: s.offers[index], quantity: quantity, at: now, calendar: NYCalendar.calendar)
+            if let rewardID, let rewards {
+                // Like the real store: after every other rule, and nothing changes if it is refused.
+                do { try rewards.claim(rewardID, reservationID: reservationID, at: now) } catch {
+                    throw ReservationError.rewardUnavailable
+                }
+            }
             s.offers[index].quantityReserved += quantity
             s.codes += 1
             let reservation = Reservation(
@@ -98,6 +108,7 @@ nonisolated final class FakeMarketplace: OfferRepository, ReservationRepository,
     func cancel(reservationID: UUID, reason: CancelReason?, at now: Date) async throws -> Reservation {
         try mutate(reservationID) { s, r, offerIndex in
             try ReservationPolicy.validateCancel(of: r, at: now)
+            rewards?.release(reservationID: reservationID)
             if let i = offerIndex { s.offers[i].quantityReserved -= r.quantity }
             r.cancelledAt = now
             r.cancelReason = reason

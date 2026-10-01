@@ -100,8 +100,8 @@ struct RewardsListModelTests {
         let reservation = try await reserveUsing(reward, in: harness)
         let model = await model(harness)
         #expect(model.used.count == 1)
+        // Cancelling gives the reward back by itself.
         _ = try await harness.marketplace.cancel(reservationID: reservation.id, reason: nil, at: Fixture.sep(23, 10))
-        try await harness.walkRewards.releaseReward(reservationID: reservation.id)
         await model.load()
         #expect(model.ready.count == 1)
         #expect(model.used.isEmpty)

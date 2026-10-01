@@ -403,6 +403,71 @@ struct PickupWalkingTests {
         #expect(harness.clock.now == reservation.snapshot.pickupWindow.end.addingTimeInterval(-300))
     }
 
+    // MARK: Saved fixes and a killed app
+
+    /// An order already collected, with a walk the app never finished crediting.
+    func interrupted(saved: [WalkSample]) async throws -> (PickupModel, Harness, Reservation) {
+        let harness = Harness(now: Fixture.sep(24, 8, 30), offers: [Self.breakfast])
+        let reservation = harness.marketplace.add(
+            Fixture.reservation(for: Self.breakfast, collectedAt: Fixture.sep(24, 8, 20)))
+        _ = try await harness.walkRewards.startWalk(
+            reservationID: reservation.id, restaurantID: "near", at: Fixture.sep(24, 8))
+        harness.walkTracker.saveFixes(saved, for: reservation.id)
+        let model = PickupModel(
+            reservationID: reservation.id, origin: ResolvedLocation(coordinate: Fixture.licCenter, source: .device),
+            dependencies: harness.dependencies)
+        return (model, harness, reservation)
+    }
+
+    @Test func aWalkInterruptedAfterConfirmingIsCreditedFromTheSavedFixes() async throws {
+        let (model, harness, reservation) = try await interrupted(saved: Self.track())
+        await model.load()
+        let walk = try #require(model.walk)
+        #expect(walk.finishedAt != nil)
+        #expect(walk.rejection == nil)
+        #expect(abs(walk.creditedMiles - 0.3) < 0.02)
+        #expect(abs(try await harness.walkRewards.totalMiles() - 0.3) < 0.02)
+        #expect(harness.walkTracker.wasDiscarded(reservation.id))
+        #expect(!harness.walkTracker.hasSavedFixes(for: reservation.id))
+    }
+
+    @Test func aWalkInterruptedWithNothingSavedEndsWithNoMilesAndAReason() async throws {
+        let (model, harness, _) = try await interrupted(saved: [])
+        await model.load()
+        #expect(model.walk?.finishedAt != nil)
+        #expect(model.walk?.rejection == .notEnoughData)
+        #expect(try await harness.walkRewards.totalMiles() == 0)
+    }
+
+    @Test func aCreditedWalkDiscardsItsSavedFixes() async throws {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        await model.startWalk()
+        harness.walkTracker.saveFixes(Self.track(), for: reservation.id)
+        await model.collect()
+        #expect(model.walk?.finishedAt != nil)
+        #expect(harness.walkTracker.wasDiscarded(reservation.id))
+    }
+
+    @Test func aWalkThatFailsToCreditKeepsItsSavedFixesForARetry() async throws {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        await model.startWalk()
+        harness.walkTracker.saveFixes(Self.track(), for: reservation.id)
+        harness.walkRewards.wipe()  // the walk record is gone, so crediting it fails
+        await model.collect()
+        #expect(!harness.walkTracker.wasDiscarded(reservation.id))
+        #expect(harness.walkTracker.hasSavedFixes(for: reservation.id))
+    }
+
+    @Test func aCancelledOrderDiscardsItsWalksSavedFixes() async throws {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
+        await model.startWalk()
+        harness.walkTracker.saveFixes(Self.track(), for: reservation.id)
+        _ = try await harness.marketplace.cancel(reservationID: reservation.id, reason: nil, at: Fixture.sep(24, 7, 5))
+        await model.load()
+        #expect(harness.walkTracker.wasDiscarded(reservation.id))
+        #expect(!harness.walkTracker.isTracking(reservation.id))
+    }
+
     // MARK: Miles earned
 
     @Test func aWalkedPickupShowsTheMilesEarnedWithTheFirstCatchphrase() async throws {
@@ -660,12 +725,10 @@ struct ManageOrderModelTests {
         let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
         let reward = Reward(milestoneMiles: 1, earnedAt: Fixture.sep(20, 9))
         harness.walkRewards.seed(rewards: [reward])
-        let reservationID = UUID()
-        _ = try await harness.walkRewards.redeemReward(
-            id: reward.id, reservationID: reservationID, at: Fixture.sep(24, 7))
+        // Reserving spends the reward itself (the store claims it in the same step).
         let reserved = try await harness.marketplace.reserve(
-            offerID: Self.offer.id, quantity: 1, reservationID: reservationID, rewardID: reward.id,
-            at: Fixture.sep(24, 7))
+            offerID: Self.offer.id, quantity: 1, reservationID: UUID(), rewardID: reward.id, at: Fixture.sep(24, 7))
+        #expect(try await harness.walkRewards.rewards().first?.isAvailable == false)
         let model = ManageOrderModel(reservationID: reserved.id, dependencies: harness.dependencies)
         await model.load()
         await model.cancel()

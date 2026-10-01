@@ -13,10 +13,13 @@ import SwiftData
 public actor UserDataStore: ModelActor {
     public nonisolated let modelContainer: ModelContainer
     public nonisolated let modelExecutor: any ModelExecutor
-    private let broadcaster = Broadcaster<UserDataChange>()
+    private let broadcaster: Broadcaster<UserDataChange>
 
-    public init(modelContainer: ModelContainer) {
+    /// - Parameter changes: The change feed. Pass the same one to `MarketplaceStore` so rewards it spends or
+    ///   returns reach the screens listening here.
+    public init(modelContainer: ModelContainer, changes: Broadcaster<UserDataChange> = Broadcaster()) {
         self.modelContainer = modelContainer
+        self.broadcaster = changes
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
         modelExecutor = DefaultSerialModelExecutor(modelContext: context)
@@ -90,6 +93,7 @@ public actor UserDataStore: ModelActor {
         try modelContext.fetch(FetchDescriptor<PreferencesEntity>()).forEach(modelContext.delete)
         try modelContext.fetch(FetchDescriptor<CommuteProfileEntity>()).forEach(modelContext.delete)
         try modelContext.fetch(FetchDescriptor<WalkEntity>()).forEach(modelContext.delete)
+        try modelContext.fetch(FetchDescriptor<WalkSampleEntity>()).forEach(modelContext.delete)
         try modelContext.fetch(FetchDescriptor<RewardEntity>()).forEach(modelContext.delete)
         try save(.reset)
     }

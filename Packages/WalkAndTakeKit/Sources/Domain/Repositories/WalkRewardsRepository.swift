@@ -40,8 +40,10 @@ public protocol WalkRewardsRepository: Sendable {
         reservationID: UUID, verdict: WalkVerdict, at now: Date, calendar: Calendar
     ) async throws -> WalkCompletion
     /// Marks a banked reward as used by a reservation. Throws if it is already used.
+    /// Reserving and cancelling do this themselves, atomically, inside the reservation store; call it directly
+    /// only for rewards that don't go through a reservation (demo tools, tests).
     func redeemReward(id: UUID, reservationID: UUID, at now: Date) async throws -> Reward
-    /// Undoes `redeemReward` for a reservation, e.g. when the reservation could not be made.
+    /// Undoes `redeemReward` for a reservation. Cancelling an order does this itself, atomically.
     func releaseReward(reservationID: UUID) async throws
     func changes() -> AsyncStream<UserDataChange>
 }

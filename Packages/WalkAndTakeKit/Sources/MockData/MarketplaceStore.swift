@@ -18,6 +18,8 @@ public actor MarketplaceStore: ModelActor {
     let seed: Seed
     let codes: any PickupCodeGenerator
     let broadcaster = Broadcaster<MarketplaceChange>()
+    /// Reward changes made here (spent on reserve, returned on cancel), sent on `UserDataStore`'s feed.
+    let rewardChanges: Broadcaster<UserDataChange>
     var calendar: Calendar { NYCalendar.calendar }
 
     /// A hand-written `ModelActor` (instead of `@ModelActor`) so the seed and code
@@ -25,7 +27,8 @@ public actor MarketplaceStore: ModelActor {
     public init(
         modelContainer: ModelContainer,
         seed: Seed,
-        codes: any PickupCodeGenerator = RandomPickupCodeGenerator()
+        codes: any PickupCodeGenerator = RandomPickupCodeGenerator(),
+        rewardChanges: Broadcaster<UserDataChange> = Broadcaster()
     ) {
         self.modelContainer = modelContainer
         let context = ModelContext(modelContainer)
@@ -33,6 +36,7 @@ public actor MarketplaceStore: ModelActor {
         modelExecutor = DefaultSerialModelExecutor(modelContext: context)
         self.seed = seed
         self.codes = codes
+        self.rewardChanges = rewardChanges
     }
 
     public nonisolated func changes() -> AsyncStream<MarketplaceChange> {
@@ -93,6 +97,10 @@ public actor MarketplaceStore: ModelActor {
 
     func restaurantEntity(id: String) throws -> RestaurantEntity? {
         try modelContext.fetch(FetchDescriptor<RestaurantEntity>(predicate: #Predicate { $0.id == id })).first
+    }
+
+    func rewardEntity(id: UUID) throws -> RewardEntity? {
+        try modelContext.fetch(FetchDescriptor<RewardEntity>(predicate: #Predicate { $0.id == id })).first
     }
 
     func reservationEntity(id: UUID) throws -> ReservationEntity? {

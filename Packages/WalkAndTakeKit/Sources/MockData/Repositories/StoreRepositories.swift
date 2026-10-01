@@ -11,4 +11,4 @@ import Foundation
 
 extension MarketplaceStore: OfferRepository, ReservationRepository, ReviewRepository {}
 
-extension UserDataStore: FavoritesRepository, PreferencesRepository, WalkRewardsRepository {}
+extension UserDataStore: FavoritesRepository, PreferencesRepository, WalkRewardsRepository, WalkSampleStoring {}

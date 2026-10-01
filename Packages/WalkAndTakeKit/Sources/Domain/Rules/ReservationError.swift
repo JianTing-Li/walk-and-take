@@ -12,6 +12,8 @@ public enum ReservationError: Error, Hashable, Sendable {
     case windowClosed
     case notVisibleYet
     case invalidQuantity
+    /// The walking reward is gone or was already used by another reservation.
+    case rewardUnavailable
 
     // Changing, cancelling or collecting an existing reservation
     case reservationNotFound
