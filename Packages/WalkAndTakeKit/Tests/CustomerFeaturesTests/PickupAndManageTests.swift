@@ -253,8 +253,8 @@ struct PickupWalkingTests {
         harness.walkTracker.script(Array(Self.track().prefix(3)))  // a third of the way
         await model.startWalk()
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.10 mi walked · 0.20 mi to go")
-        #expect(walking.countingText == "Counting +0.10 mi so far")
+        #expect(walking.progressText == "0.1 mi walked · 0.2 mi to go")
+        #expect(walking.countingText == "Counting +0.1 mi so far")
         #expect(abs((walking.fraction ?? 0) - 1.0 / 3) < 0.02)
     }
 
@@ -265,14 +265,14 @@ struct PickupWalkingTests {
         harness.walkTracker.script(Array(Self.track().prefix(5)))
         await model.refreshLiveProgress()
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.20 mi walked · 0.10 mi to go")
+        #expect(walking.progressText == "0.2 mi walked · 0.1 mi to go")
     }
 
     @Test func arrivingSaysYouAreAtTheDoor() async throws {
         let (model, _, _) = await pickup(at: Fixture.sep(24, 8))
         await model.startWalk()  // the full track ends at the door
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.30 mi walked · You're at the door")
+        #expect(walking.progressText == "0.3 mi walked · You're at the door")
         #expect((walking.fraction ?? 0) > 0.99)
     }
 
@@ -302,10 +302,10 @@ struct PickupWalkingTests {
         await model.startWalk()
         await model.collect()
         let card = try #require(model.walkEarned)
-        #expect(card.headline == "+0.30 mi earned")
+        #expect(card.headline == "+0.3 mi earned")
         #expect(card.catchphrase == "Walk&Take: every mile gets you something.")
-        #expect(card.contribution == "Walked pickup #1 · added 0.30 mi")
-        #expect(card.progress == "0.30 mi walked in total · 0.70 mi to your next reward")
+        #expect(card.contribution == "Walked pickup #1")
+        #expect(card.progress == "0.3 mi walked in total · 0.7 mi to your next reward")
         #expect(card.unlock == nil)
     }
 
@@ -316,8 +316,8 @@ struct PickupWalkingTests {
         await model.collect()
         let card = try #require(model.walkEarned)
         #expect(card.catchphrase == "Walk it. Earn it.")
-        #expect(card.contribution == "Walked pickup #2 · added 0.30 mi")
-        #expect(card.progress == "0.70 mi walked in total · 0.30 mi to your next reward")
+        #expect(card.contribution == "Walked pickup #2")
+        #expect(card.progress == "0.7 mi walked in total · 0.3 mi to your next reward")
     }
 
     @Test func reachingAMilestoneShowsTheUnlock() async throws {
@@ -327,7 +327,7 @@ struct PickupWalkingTests {
         await model.collect()
         let card = try #require(model.walkEarned)
         #expect(card.unlock == "Reward unlocked: 50% off one bag")
-        #expect(card.progress == "1.20 mi walked in total · 3.80 mi to your next reward")
+        #expect(card.progress == "1.2 mi walked in total · 3.8 mi to your next reward")
     }
 
     @Test func theSameCardShowsWhenTheOrderIsOpenedAgain() async throws {
@@ -371,8 +371,9 @@ struct PickupWalkingTests {
         #expect(walk.finishedAt != nil)
         #expect(walk.rejection == nil)
         #expect(abs(walk.creditedMiles - 0.3) < 0.02)
-        #expect(model.walkResultText == "+0.30 mi counted toward rewards")
-        #expect(model.summary.last?.label == "Walk")
+        #expect(model.walkResultText == "+0.3 mi counted toward rewards")
+        #expect(model.walkEarned != nil)
+        #expect(!model.summary.contains { $0.label == "Walk" })  // the earned card already says it
         #expect(!harness.walkTracker.isTracking(reservation.id))
         #expect(model.trackingStatus == .idle)
         #expect(abs(try await harness.walkRewards.totalMiles() - 0.3) < 0.02)
@@ -397,6 +398,7 @@ struct PickupWalkingTests {
         #expect(model.walk?.creditedMiles == 0)
         #expect(model.walk?.rejection == .simulatedLocation)
         #expect(model.walkResultText == WalkRejection.simulatedLocation.message)
+        #expect(model.summary.last?.label == "Walk")  // no earned card, so the row explains why
         #expect(try await harness.walkRewards.totalMiles() == 0)
     }
 

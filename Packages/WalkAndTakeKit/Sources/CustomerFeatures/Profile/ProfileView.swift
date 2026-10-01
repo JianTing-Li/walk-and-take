@@ -67,7 +67,8 @@ public struct ProfileView: View {
                     Text("Walking rewards")
                 } footer: {
                     Text(
-                        "Miles count from pickups you walk to. One pickup adds up to 2 mi. Use a reward when you reserve."
+                        "Miles count from pickups you walk to. One pickup adds up to "
+                            + "\(WalkCopy.milestone(WalkRewardLadder.maxMilesPerPickup)) mi. Use a reward when you reserve."
                     )
                 }
             }

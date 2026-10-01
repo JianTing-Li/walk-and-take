@@ -190,18 +190,6 @@ public final class OfferDetailModel {
             unlock: WalkCopy.unlockText(currentMiles: walkMiles, distance: distance))
     }
 
-    /// Review line above the Reserve button: "0.7 mi walk · +0.7 mi toward a reward".
-    public var walkReviewLine: String? {
-        guard flags.walkRewards, canReserve, let distance = walkDistance else { return nil }
-        return
-            "\(WalkCopy.walkTitle(forDistance: distance)) · +\(WalkCopy.miles(WalkCopy.earnedMiles(forDistance: distance))) mi toward a reward"
-    }
-
-    /// Above the Reserve button: miles only count for a walked pickup. Shown while the bag can be reserved.
-    public var walkReminderLine: String? {
-        flags.walkRewards && canReserve ? WalkCopy.reserveReminder : nil
-    }
-
     /// "50% off one bag: −$3.00" while the reward is switched on.
     public var rewardLine: String? {
         reserve.useReward && reserve.showsRewardToggle

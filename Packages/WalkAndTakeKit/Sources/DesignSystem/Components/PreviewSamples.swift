@@ -31,7 +31,6 @@ enum PreviewSamples {
         var content = bagCard
         content.distanceText = "0.9 mi away"
         content.walkRewardText = "+0.9 mi toward a reward"
-        content.walkCompareText = "0.7 mi farther than the nearest · earns 0.7 mi more"
         return content
     }()
 

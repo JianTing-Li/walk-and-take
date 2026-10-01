@@ -160,7 +160,7 @@ public final class DiscoverModel {
             .filter { category == nil || $0.category == category }
             .filter(catalog.matchesPreferences)
         guard OfferVisibility.showsTomorrow(at: now, calendar: catalog.calendar) else {
-            return [DiscoverSection(kind: .all, items: items(listed, nearestMiles: nearestMiles(in: listed)))]
+            return [DiscoverSection(kind: .all, items: items(listed))]
         }
         let today = NYCalendar.dayKey(for: now)
         let (tonight, tomorrow) = listed.reduce(into: ([Offer](), [Offer]())) { parts, offer in
@@ -170,26 +170,17 @@ public final class DiscoverModel {
                 parts.1.append(offer)
             }
         }
-        let nearest = nearestMiles(in: listed)
         return [
-            DiscoverSection(kind: .tonight, items: items(tonight, nearestMiles: nearest)),
-            DiscoverSection(kind: .tomorrow, items: items(tomorrow, nearestMiles: nearest)),
+            DiscoverSection(kind: .tonight, items: items(tonight)),
+            DiscoverSection(kind: .tomorrow, items: items(tomorrow)),
         ].filter { !$0.items.isEmpty }
     }
 
     public var isListEmpty: Bool { sections.allSatisfy(\.items.isEmpty) }
 
-    /// Walking distance to the nearest bag you could reserve in the listed offers, the baseline the
-    /// cards compare against. Nil unless there are two or more to compare.
-    private func nearestMiles(in offers: [Offer]) -> Double? {
-        let reservable = offers.filter { catalog.isReservable($0, at: now) }
-        guard reservable.count >= 2 else { return nil }
-        return reservable.map(catalog.distanceMiles(to:)).min()
-    }
-
-    private func items(_ offers: [Offer], nearestMiles: Double?) -> [DiscoverItem] {
+    private func items(_ offers: [Offer]) -> [DiscoverItem] {
         sorted(offers).compactMap { offer in
-            catalog.card(for: offer, at: now, nearestMiles: nearestMiles).map {
+            catalog.card(for: offer, at: now).map {
                 DiscoverItem(
                     offerID: offer.id, restaurantID: offer.restaurantID, card: $0,
                     isFavorite: catalog.favoriteIDs.contains(offer.restaurantID))

@@ -350,7 +350,7 @@ public final class PickupModel {
     /// After pickup: miles counted, or why none were.
     public var walkResultText: String? {
         guard flags.walkRewards, let walk, walk.finishedAt != nil else { return nil }
-        if walk.creditedMiles > 0 { return "+\(WalkCopy.miles(walk.creditedMiles, places: 2)) mi counted toward rewards" }
+        if walk.creditedMiles > 0 { return "+\(WalkCopy.miles(walk.creditedMiles)) mi counted toward rewards" }
         return walk.rejection?.message
     }
 
@@ -378,7 +378,8 @@ public final class PickupModel {
             rows.append(("Reward", "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"))
         }
         rows.append(("Total", reservation.total.usd))
-        if let walkResultText { rows.append(("Walk", walkResultText)) }
+        // The earned card already shows a credited walk; the row only explains walks that earned nothing.
+        if walkEarned == nil, let walkResultText { rows.append(("Walk", walkResultText)) }
         return rows
     }
 
