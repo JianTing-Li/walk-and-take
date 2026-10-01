@@ -3,6 +3,7 @@
 //  WalkAndTakeKit
 //
 
+import DesignSystem
 import Platform
 import SwiftUI
 
@@ -24,7 +25,7 @@ struct QRCodeView: View {
         }
         .frame(width: size, height: size)
         .padding(10)
-        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+        .background(.white, in: RoundedRectangle(cornerRadius: Radius.largeTile))
         .accessibilityLabel("QR code for pickup code \(text.map(String.init).joined(separator: " "))")
     }
 }

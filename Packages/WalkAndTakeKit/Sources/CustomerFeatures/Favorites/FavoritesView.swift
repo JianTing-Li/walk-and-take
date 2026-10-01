@@ -15,6 +15,7 @@ public struct FavoritesView<Destination: View>: View {
     let destination: (FavoritesRoute) -> Destination
 
     @Environment(\.openURL) private var openURL
+    @ScaledMetric(relativeTo: .body) private var chevronWidth: CGFloat = 19
 
     public init(
         model: FavoritesModel,
@@ -110,7 +111,7 @@ public struct FavoritesView<Destination: View>: View {
             NavigationLink(value: FavoritesRoute.offer(id: offerID)) { label }
         } else {
             // Leave room where the chevron would be so bells line up.
-            label.padding(.trailing, 19)
+            label.padding(.trailing, chevronWidth)
         }
     }
 }

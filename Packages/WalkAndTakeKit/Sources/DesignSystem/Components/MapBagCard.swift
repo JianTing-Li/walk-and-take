@@ -88,7 +88,7 @@ public struct MapBagCard: View {
                 }
             }
         }
-        .padding(14)
+        .padding(Spacing.l)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.floating))
         .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
     }

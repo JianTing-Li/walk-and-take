@@ -33,7 +33,6 @@ struct PickupModelTests {
         let (model, _) = await pickup(Fixture.reservation(for: Self.tomorrow), at: Fixture.sep(24, 20, 30))
         #expect(model.header?.title == "Pickup opens tomorrow at 7:30 AM")
         #expect(model.header?.subtitle == "Your bag is held until 10:00 AM")
-        #expect(model.confirmFromText == "You can confirm pickup from tomorrow at 7:30 AM")
         #expect(model.code == "QW3E")
         #expect(model.pickupInstructions == "Ask at the counter.")
         #expect(model.summary.map(\.value)[1] == "Pick up tomorrow, Fri Sep 25, 7:30–10:00 AM")
@@ -90,7 +89,6 @@ struct PickupModelTests {
     @Test func missedAndCancelledHeaders() async {
         let (missed, _) = await pickup(Fixture.reservation(for: Self.breakfast), at: Fixture.sep(24, 10, 30))
         #expect(missed.header?.title == "Pickup window ended")
-        #expect(missed.confirmFromText == nil)
         let cancelled = Fixture.reservation(for: Self.breakfast, cancelledAt: Fixture.sep(24, 7))
         let (model, _) = await pickup(cancelled, at: Fixture.sep(24, 8))
         #expect(model.header?.title == "Order cancelled")

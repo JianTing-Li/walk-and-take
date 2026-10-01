@@ -51,10 +51,13 @@ struct PickupView<RateSheet: View>: View {
             VStack(spacing: Spacing.xl) {
                 if let header = model.header { StatusHeader(header: header) }
 
+                // Ready for pickup: the code goes first, right above the swipe.
+                if model.status == .readyNow { PickupCodeCard(code: model.code) }
+
                 if let section = model.walkSection { walkSection(section) }
 
                 if model.isActive {
-                    PickupCodeCard(code: model.code)
+                    if model.status != .readyNow { PickupCodeCard(code: model.code) }
                     PickupSteps(
                         restaurantName: model.restaurantName, addressLine: model.addressLine,
                         instructions: model.pickupInstructions, directionsURL: model.directionsURL)
@@ -195,27 +198,13 @@ struct PickupView<RateSheet: View>: View {
                 .id(model.collectFailed)  // a failed confirm resets the knob so you can try again
                 .padding(Spacing.l)
                 .background(.bar)
-        } else if let text = model.confirmFromText {
-            Text(text)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(Spacing.xl)
-                .background(.bar)
         }
     }
 
     private var summary: some View {
         VStack(spacing: Spacing.s) {
             ForEach(model.summary, id: \.label) { row in
-                HStack(alignment: .top) {
-                    Text(row.label).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(row.value).fontWeight(.semibold).multilineTextAlignment(.trailing)
-                }
-                .font(.subheadline)
-                .accessibilityElement(children: .combine)
+                SummaryRow(row.label, row.value)
             }
         }
         .padding(Spacing.l)
@@ -245,7 +234,7 @@ extension PickupStatusPill.Tone {
         switch self {
         case .readyNow: .splashTeal
         case .upcoming: .orange
-        case .collected: .green
+        case .collected: .splashTeal
         case .inactive: .secondary
         }
     }

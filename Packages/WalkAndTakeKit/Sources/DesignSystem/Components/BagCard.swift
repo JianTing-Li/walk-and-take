@@ -77,7 +77,8 @@ public struct BagCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// 100 pt tall like the draft, but grows with large text so the badge never clips.
+    /// A short colored band (it grows with large text so badges never clip). The category symbol sits to
+    /// the right, clear of the badges and the heart.
     private var header: some View {
         HStack(alignment: .top) {
             StatusBadge(text: content.badgeText, isUrgent: content.isUrgent)
@@ -89,14 +90,20 @@ public struct BagCard: View {
                     .foregroundStyle(.black)
                     .fixedSize()
             }
-            Spacer()
+            Spacer(minLength: Spacing.xs)
+            Image(systemName: content.category.symbol)
+                .font(.system(size: 26))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(maxHeight: .infinity)
+                .accessibilityHidden(true)
             if let onToggleFavorite {
                 FavoriteButton(isFavorite: isFavorite, action: onToggleFavorite)
             }
         }
         .padding(Spacing.s)
-        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        .background { CategoryGradient(category: content.category, symbolSize: 42) }
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
+        .background { CategoryGradient(category: content.category, symbolSize: nil) }
     }
 
     private var details: some View {

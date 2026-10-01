@@ -67,7 +67,7 @@ struct MapBrowseView: View {
                     ForEach(MapBrowseModel.Day.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, 72)
+                .frame(maxWidth: 240)  // centered, clear of the corner buttons
                 .padding(.top, Spacing.xs)
             }
         }
@@ -118,7 +118,7 @@ struct MapBrowseView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(14)
+        .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card))
     }

@@ -15,6 +15,7 @@ public struct DiscoverView<Destination: View>: View {
     let destination: (DiscoverRoute) -> Destination
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     public init(
         model: DiscoverModel,
@@ -91,18 +92,17 @@ public struct DiscoverView<Destination: View>: View {
                             if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                         }
                     }
-                    CategoryChips(selection: $model.category)
-                    Picker("Sort", selection: $model.sort) {
-                        ForEach(model.availableSorts) { Text($0.rawValue).tag($0) }
+                    VStack(alignment: .leading, spacing: Spacing.s) {
+                        CategoryChips(selection: $model.category)
+                        sortPicker
                     }
-                    .pickerStyle(.segmented)
 
                     if model.isListEmpty {
                         EmptyStateView(
                             "No bags right now", systemImage: "bag",
                             message: "Check back soon. Stores add bags throughout the morning."
                         )
-                        .padding(.top, 40)
+                        .padding(.top, Spacing.xxl)
                     } else {
                         sections
                     }
@@ -111,6 +111,22 @@ public struct DiscoverView<Destination: View>: View {
                 .padding(.bottom, Spacing.xxl)
             }
             .background(Color(.systemGroupedBackground))
+        }
+    }
+
+    /// Segmented normally; a menu at accessibility text sizes, where four segments would truncate.
+    @ViewBuilder
+    private var sortPicker: some View {
+        let picker = Picker("Sort", selection: $model.sort) {
+            ForEach(model.availableSorts) { Text($0.rawValue).tag($0) }
+        }
+        if dynamicTypeSize.isAccessibilitySize {
+            HStack {
+                Text("Sort").foregroundStyle(.secondary)
+                picker.pickerStyle(.menu)
+            }
+        } else {
+            picker.pickerStyle(.segmented)
         }
     }
 

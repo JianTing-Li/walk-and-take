@@ -21,7 +21,8 @@ public struct ProfileView: View {
         NavigationStack(path: $navigation.profilePath) {
             Group {
                 switch model.state {
-                case .loading: LoadingView()
+                // The form shows at once; values fill in a moment later, so there's no spinner flash.
+                case .loading: form
                 case .failed(let message):
                     EmptyStateView(
                         "Something went wrong", systemImage: "exclamationmark.triangle", message: message,
@@ -61,6 +62,11 @@ public struct ProfileView: View {
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                         .accessibilityIdentifier("profile.walkProgress")
+                } header: {
+                    Text("Walking rewards")
+                }
+                // Its own section, so the links get rounded corners and a gap under the card.
+                Section {
                     // With rewards ready, the card's button opens the list; otherwise this row does.
                     if walkProgress.readyText == nil {
                         NavigationLink(value: ProfileRoute.rewards) {
@@ -72,8 +78,6 @@ public struct ProfileView: View {
                         Label("Walk history", systemImage: "list.bullet.rectangle")
                     }
                     .accessibilityIdentifier("profile.walkHistory")
-                } header: {
-                    Text("Walking rewards")
                 } footer: {
                     Text(
                         "Miles count from pickups you walk to. One pickup adds up to "

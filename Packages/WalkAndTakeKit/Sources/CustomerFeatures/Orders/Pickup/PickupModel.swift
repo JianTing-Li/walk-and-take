@@ -277,18 +277,6 @@ public final class PickupModel {
         return "Changes closed at \(deadline). The store is getting your bag ready."
     }
 
-    /// Bottom bar for an upcoming order: "You can confirm pickup from tomorrow at 7:30 AM".
-    public var confirmFromText: String? {
-        guard status == .upcoming, let reservation else { return nil }
-        let window = reservation.snapshot.pickupWindow
-        let when = time(window.start)
-        return switch PickupDayFormatter.day(of: window, now: now, calendar: calendar) {
-        case .today, .tonight: "You can confirm pickup from \(when)"
-        case .tomorrow: "You can confirm pickup from tomorrow at \(when)"
-        case .other(let date): "You can confirm pickup from \(TimeText.shortDate(date, calendar: calendar)) at \(when)"
-        }
-    }
-
     /// "Vernon Blvd & 48th Ave, Long Island City · 0.2 mi"
     public var addressLine: String {
         guard let snapshot = reservation?.snapshot else { return "" }

@@ -10,6 +10,8 @@ public struct StarRating: View {
     @Binding var rating: Int
     var size: CGFloat
     var label: String
+    /// Stars grow with the text size.
+    @ScaledMetric private var scale: CGFloat = 1
 
     public init(rating: Binding<Int>, size: CGFloat = 24, label: String = "Rating") {
         _rating = rating
@@ -18,11 +20,14 @@ public struct StarRating: View {
     }
 
     public var body: some View {
-        HStack(spacing: size * 0.2) {
+        HStack(spacing: max(0, size * scale * 1.2 - 44)) {
             ForEach(1...5, id: \.self) { star in
                 Image(systemName: star <= rating ? "star.fill" : "star")
-                    .font(.system(size: size))
+                    .font(.system(size: size * scale))
                     .foregroundStyle(star <= rating ? Color.yolk : Color.secondary.opacity(0.5))
+                    // At least 44 pt to tap, even for small stars.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                     .onTapGesture { rating = star }
             }
         }

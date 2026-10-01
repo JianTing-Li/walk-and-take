@@ -71,10 +71,12 @@ public struct OfferDetailView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
-                CategoryGradient(category: model.category, symbolSize: 64)
-                    .frame(height: 180)
+                CategoryGradient(category: model.category, symbolSize: 48)
+                    .frame(height: 120)
                     .overlay(alignment: .bottomLeading) {
-                        StatusBadge(text: model.badgeText, isUrgent: model.isUrgent).padding(Spacing.m)
+                        if let badge = model.heroBadgeText {
+                            StatusBadge(text: badge, isUrgent: model.isUrgent).padding(Spacing.m)
+                        }
                     }
 
                 VStack(alignment: .leading, spacing: Spacing.xl) {
@@ -94,7 +96,7 @@ public struct OfferDetailView: View {
                             LocationPreview(name: model.restaurantName, coordinate: coordinate)
                         }
                     }
-                    .padding(14)
+                    .padding(Spacing.l)
                     .background(
                         Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
 

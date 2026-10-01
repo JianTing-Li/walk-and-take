@@ -14,7 +14,7 @@ public struct PickupStatusPill: View {
             switch self {
             case .readyNow: .splashTeal
             case .upcoming: .orange
-            case .collected: .green
+            case .collected: .splashTeal
             case .inactive: .secondary
             }
         }

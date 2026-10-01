@@ -16,19 +16,19 @@ struct FavoriteStoreRow: View {
         HStack(spacing: Spacing.m) {
             CategoryTile(category: row.category)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(row.name).font(.headline)
                 statusText
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: Spacing.xs)
 
             if showsBell {
                 Button(action: onToggleAlerts) {
                     Image(systemName: row.alertsOn ? "bell.fill" : "bell.slash")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(row.alertsOn ? Color.splashTeal : .secondary)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(
                             row.alertsOn ? Color.splashTeal.opacity(0.15) : Color(.tertiarySystemFill), in: Circle()
                         )
@@ -42,18 +42,23 @@ struct FavoriteStoreRow: View {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder
+    /// Icon and text sit tight together, in a fixed-width icon column so every row's text lines up.
     private var statusText: some View {
-        switch row.status {
-        case .availableNow(let text):
-            Label(text, systemImage: "bag.fill").foregroundStyle(Color.splashTeal)
-                .font(.caption.weight(.semibold))
-        case .upcoming(let text):
-            Label(text, systemImage: "clock").foregroundStyle(.orange)
-                .font(.caption.weight(.semibold))
-        case .none:
-            Text("No bags left today").foregroundStyle(.secondary)
-                .font(.caption)
+        let (symbol, text, color): (String, String, Color) =
+            switch row.status {
+            case .availableNow(let text): ("bag.fill", text, .splashTeal)
+            case .upcoming(let text): ("clock", text, .orange)
+            case .none: ("bag", "No bags left today", .secondary)
+            }
+        return HStack(spacing: Spacing.xxs) {
+            Image(systemName: symbol)
+                .frame(width: iconWidth)
+                .accessibilityHidden(true)
+            Text(text)
         }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(color)
     }
+
+    @ScaledMetric(relativeTo: .caption) private var iconWidth: CGFloat = 16
 }

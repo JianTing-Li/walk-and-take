@@ -174,6 +174,11 @@ public final class OfferDetailModel {
     }
 
     /// "Opens tomorrow at 7:30 AM", "Ends in 25 min", "Sold out".
+    /// The hero badge, unless it says the same as the time row ("Opens at 12:00 PM" twice).
+    public var heroBadgeText: String? {
+        badgeText.isEmpty || badgeText == urgencyText ? nil : badgeText
+    }
+
     public var urgencyText: String {
         offer.map { OfferAvailability.urgencyText(for: $0, at: now, calendar: calendar) } ?? ""
     }
