@@ -16,6 +16,7 @@ import Platform
 public final class RateOrderModel {
     public enum State: Equatable {
         case loading, rating, submitted, notFound
+        case failed(String)
     }
 
     public private(set) var state: State = .loading
@@ -41,7 +42,14 @@ public final class RateOrderModel {
     }
 
     public func load() async {
-        guard let reservation = try? await dependencies.reservations.reservation(id: reservationID) else {
+        let found: Reservation?
+        do {
+            found = try await dependencies.reservations.reservation(id: reservationID)
+        } catch {
+            state = .failed("Couldn't load this order. Please try again.")
+            return
+        }
+        guard let reservation = found else {
             state = .notFound
             return
         }

@@ -17,6 +17,7 @@ import Platform
 public final class ManageOrderModel {
     public enum State: Equatable {
         case loading, loaded, notFound
+        case failed(String)
     }
 
     public private(set) var state: State = .loading
@@ -54,7 +55,15 @@ public final class ManageOrderModel {
 
     public func load(resettingQuantity: Bool = true) async {
         now = dependencies.clock.now
-        guard let reservation = try? await dependencies.reservations.reservation(id: reservationID) else {
+        let found: Reservation?
+        do {
+            found = try await dependencies.reservations.reservation(id: reservationID)
+        } catch {
+            // Keep what's on screen if a refresh fails; only an empty screen shows the error.
+            if state == .loading { state = .failed("Couldn't load this order. Please try again.") }
+            return
+        }
+        guard let reservation = found else {
             state = .notFound
             return
         }
@@ -64,6 +73,11 @@ public final class ManageOrderModel {
         if resettingQuantity { quantity = reservation.quantity }
         quantity = min(max(quantity, 1), maxQuantity)
         state = .loaded
+    }
+
+    public func retry() async {
+        state = .loading
+        await load()
     }
 
     // MARK: - Actions
@@ -117,7 +131,11 @@ public final class ManageOrderModel {
         reservation.map { PickupDayFormatter.short($0.snapshot.pickupWindow, now: now, calendar: calendar) } ?? ""
     }
 
-    public var newTotal: Money { (reservation?.snapshot.unitPrice ?? .zero) * quantity }
+    /// The walking reward stays on one bag whatever the quantity.
+    public var newTotal: Money {
+        guard let reservation else { return .zero }
+        return reservation.snapshot.unitPrice * quantity - reservation.discount
+    }
 
     /// ("Free changes until 9:50 AM", "25 min left") or ("Changes closed at 9:50 AM", "…").
     public var deadlineNotice: (title: String, detail: String) {
@@ -139,6 +157,7 @@ public final class ManageOrderModel {
 
     public var cancelMessage: String {
         let bags = reservation?.quantity == 1 ? "bag goes" : "bags go"
-        return "Your \(bags) back on sale for other customers. You won't be charged."
+        let reward = reservation?.rewardID != nil ? " Your walking reward goes back to your rewards." : ""
+        return "Your \(bags) back on sale for other customers. You won't be charged.\(reward)"
     }
 }

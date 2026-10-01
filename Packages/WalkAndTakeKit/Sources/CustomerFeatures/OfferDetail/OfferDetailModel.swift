@@ -143,6 +143,18 @@ public final class OfferDetailModel {
     public var price: Money { offer?.price ?? .zero }
     public var estimatedValue: Money { offer?.estimatedValue ?? .zero }
     public var savingsPercent: Int { offer?.savingsPercent ?? 0 }
+
+    /// The Price row follows the reward switch: one bag's price after 50% off, and the bigger saving.
+    var usesRewardOnPrice: Bool { reserve.useReward && reserve.showsRewardToggle }
+    public var displayPrice: Money { usesRewardOnPrice ? price - reserve.rewardDiscount : price }
+
+    /// "You save 64%", or "With your reward · you save 82%".
+    public var priceNote: String {
+        guard usesRewardOnPrice, estimatedValue.cents > 0 else { return "You save \(savingsPercent)%" }
+        let percent = Int(
+            (Double(estimatedValue.cents - displayPrice.cents) / Double(estimatedValue.cents) * 100).rounded())
+        return "With your reward · you save \(percent)%"
+    }
     public var coordinate: Coordinate? { restaurant?.coordinate }
 
     public var badgeText: String {

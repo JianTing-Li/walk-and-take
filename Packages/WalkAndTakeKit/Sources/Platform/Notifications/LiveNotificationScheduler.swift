@@ -5,6 +5,7 @@
 
 import Domain
 import Foundation
+import OSLog
 import UserNotifications
 
 public struct LiveNotificationScheduler: NotificationScheduler {
@@ -35,7 +36,7 @@ public struct LiveNotificationScheduler: NotificationScheduler {
                 content: Self.content(for: alert),
                 trigger: trigger
             )
-            try? await center.add(request)
+            await add(request)
         }
     }
 
@@ -64,7 +65,7 @@ public struct LiveNotificationScheduler: NotificationScheduler {
             content: Self.content(for: alert),
             trigger: trigger
         )
-        try? await center.add(request)
+        await add(request)
     }
 
     public func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async {
@@ -77,7 +78,21 @@ public struct LiveNotificationScheduler: NotificationScheduler {
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: max(1, delay), repeats: false)
         )
-        try? await center.add(request)
+        await add(request)
+    }
+
+    private static let log = Logger(subsystem: "org.pursuit.Walk-And-Take", category: "Notifications")
+
+    /// Schedules a request, logging (instead of hiding) a refusal, e.g. iOS dropping alerts for an app
+    /// it no longer has registered.
+    private func add(_ request: UNNotificationRequest) async {
+        do {
+            try await center.add(request)
+        } catch {
+            Self.log.error(
+                "Couldn't schedule \(request.identifier, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+        }
     }
 
     private static func content(for alert: OfferAlert) -> UNMutableNotificationContent {

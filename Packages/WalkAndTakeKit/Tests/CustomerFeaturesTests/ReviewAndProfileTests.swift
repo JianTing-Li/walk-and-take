@@ -28,6 +28,15 @@ struct RateOrderModelTests {
         return (model, harness)
     }
 
+    @Test func aLoadErrorIsNotNotFound() async {
+        let harness = Harness(now: Fixture.sep(24, 9), offers: [Self.offer])
+        let reservation = harness.marketplace.add(Fixture.reservation(for: Self.offer, collectedAt: Fixture.sep(24, 8)))
+        harness.marketplace.failReads(true)
+        let model = RateOrderModel(reservationID: reservation.id, initialStars: 4, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.state == .failed("Couldn't load this order. Please try again."))
+    }
+
     @Test func startsWithTheTappedStars() async {
         let (model, _) = await rate(stars: 4)
         #expect(model.state == .rating)

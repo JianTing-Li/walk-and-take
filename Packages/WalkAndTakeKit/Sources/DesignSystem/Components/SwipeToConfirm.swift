@@ -5,7 +5,9 @@
 
 import SwiftUI
 
-/// A slide-to-confirm control so pickup isn't confirmed by an accidental tap.
+/// A slide-to-confirm control so pickup isn't confirmed by an accidental tap. It stays at the end once
+/// swiped; give it a new `.id` to reset it (e.g. after the action failed). The screen plays the success
+/// haptic when the action actually succeeds.
 public struct SwipeToConfirm: View {
     let title: String
     let action: () -> Void
@@ -62,7 +64,6 @@ public struct SwipeToConfirm: View {
             }
         }
         .frame(height: knob + 8)
-        .sensoryFeedback(.success, trigger: confirmed)
         .accessibilityElement()
         .accessibilityLabel(title)
         .accessibilityAddTraits(.isButton)

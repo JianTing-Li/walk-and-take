@@ -378,6 +378,15 @@ struct PickupWalkingTests {
         #expect(sent.isOpen)
     }
 
+    @Test func tappingStartWalkTwiceStartsOneWalk() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        async let first: Void = model.startWalk()
+        async let second: Void = model.startWalk()
+        _ = await (first, second)
+        #expect(try await harness.walkRewards.walks().count == 1)
+        #expect(!model.isStartingWalk)
+    }
+
     @Test func confirmPickupNowOpensTheWindowAndCompletesThePickup() async {
         let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
         harness.developer.isOn = true
@@ -561,6 +570,41 @@ struct ManageOrderModelTests {
         let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
         await model.load()
         return (model, harness)
+    }
+
+    @Test func aLoadErrorOffersTryAgainInsteadOfNotFound() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        let reservation = harness.marketplace.add(Fixture.reservation(for: Self.offer))
+        harness.marketplace.failReads(true)
+        let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.state == .failed("Couldn't load this order. Please try again."))
+        harness.marketplace.failReads(false)
+        await model.retry()
+        #expect(model.state == .loaded)
+    }
+
+    @Test func theNewTotalKeepsTheRewardDiscount() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        var withReward = Fixture.reservation(for: Self.offer, rewardID: UUID())
+        withReward = Reservation(
+            id: withReward.id, confirmationCode: withReward.confirmationCode, quantity: 1,
+            snapshot: withReward.snapshot, reservedAt: withReward.reservedAt, rewardID: withReward.rewardID,
+            discount: Money(cents: 299))
+        let reservation = harness.marketplace.add(withReward)
+        let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.newTotal == Money(cents: 300))  // $5.99 − $2.99
+        model.quantity = 2
+        #expect(model.newTotal == Money(cents: 899))
+    }
+
+    @Test func cancellingAnOrderWithARewardSaysTheRewardComesBack() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        let reservation = harness.marketplace.add(Fixture.reservation(for: Self.offer, rewardID: UUID()))
+        let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.cancelMessage.hasSuffix("Your walking reward goes back to your rewards."))
     }
 
     @Test func limitsAndCopy() async {

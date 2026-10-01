@@ -57,7 +57,7 @@ public struct OrdersView<Destination: View>: View {
             ) { Task { await model.retry() } }
         case .loaded, .empty:
             List {
-                if model.showsImpact {
+                if model.showsImpact, model.state != .empty {
                     Section {
                         ImpactCard(impact: model.impact)
                     }

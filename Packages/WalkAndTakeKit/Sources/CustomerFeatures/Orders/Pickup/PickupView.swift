@@ -107,6 +107,7 @@ struct PickupView<RateSheet: View>: View {
             }
         }
         .safeAreaInset(edge: .bottom) { bottomBar }
+        .sensoryFeedback(.success, trigger: model.status == .collected)
     }
 
     @ViewBuilder
@@ -132,6 +133,7 @@ struct PickupView<RateSheet: View>: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.splashTeal)
+                .disabled(model.isStartingWalk)
                 .accessibilityIdentifier("pickup.startWalk")
             }
         case .walking(let walking):
@@ -190,6 +192,7 @@ struct PickupView<RateSheet: View>: View {
     private var bottomBar: some View {
         if model.status == .readyNow {
             SwipeToConfirm(title: "Swipe to confirm pickup") { Task { await model.collect() } }
+                .id(model.collectFailed)  // a failed confirm resets the knob so you can try again
                 .padding(Spacing.l)
                 .background(.bar)
         } else if let text = model.confirmFromText {

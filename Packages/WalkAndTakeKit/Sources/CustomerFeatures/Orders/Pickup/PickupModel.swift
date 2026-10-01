@@ -40,6 +40,8 @@ public final class PickupModel {
     /// What a finished, credited walk added to the customer's miles. Worked out from their walk history,
     /// so it's the same right after pickup and whenever the order is opened later.
     public private(set) var earnings: WalkEarnings?
+    /// A walk is being started; Start walk can't be tapped again meanwhile.
+    public private(set) var isStartingWalk = false
     /// Developer mode: this walk is simulated, and whether it's walking on its own.
     public private(set) var walkIsSimulated = false
     public private(set) var isAutoWalking = false
@@ -180,7 +182,9 @@ public final class PickupModel {
     }
 
     func beginWalk() async {
-        guard let snapshot = reservation?.snapshot else { return }
+        guard !isStartingWalk, walk == nil, let snapshot = reservation?.snapshot else { return }
+        isStartingWalk = true
+        defer { isStartingWalk = false }
         do {
             walk = try await dependencies.walkRewards.startWalk(
                 reservationID: reservationID, restaurantID: snapshot.restaurantID, at: dependencies.clock.now)
@@ -255,7 +259,8 @@ public final class PickupModel {
             Header(
                 symbol: "xmark.circle.fill", tone: .inactive, title: "Order cancelled",
                 subtitle: "Cancelled at \(time(reservation.cancelledAt ?? now)). You won't be charged, "
-                    + "and your bag is back on sale for someone else.")
+                    + "and your bag is back on sale for someone else."
+                    + (reservation.rewardID != nil ? " Your walking reward is back in your rewards." : ""))
         }
     }
 

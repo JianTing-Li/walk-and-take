@@ -138,10 +138,12 @@ public struct OfferDetailView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Price").font(.headline)
-                Text("You save \(model.savingsPercent)%").font(.footnote).foregroundStyle(.secondary)
+                Text(model.priceNote).font(.footnote).foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
             }
             Spacer()
-            PriceStack(price: model.price, estimatedValue: model.estimatedValue, size: .title2)
+            PriceStack(price: model.displayPrice, estimatedValue: model.estimatedValue, size: .title2)
+                .animation(.default, value: model.displayPrice)
         }
     }
 

@@ -212,6 +212,15 @@ struct OfferDetailModelTests {
         return setup
     }
 
+    @Test func thePriceRowFollowsTheRewardSwitch() async {
+        let model = await detailWithReward().model
+        #expect(model.displayPrice == model.price)
+        #expect(model.priceNote == "You save \(model.savingsPercent)%")
+        model.reserve.useReward = true
+        #expect(model.displayPrice == Money(cents: 300))  // $5.99 − $2.99
+        #expect(model.priceNote.hasPrefix("With your reward · you save "))
+    }
+
     @Test func noToggleWithoutABankedReward() async {
         let setup = await detail()
         #expect(!setup.model.reserve.showsRewardToggle)

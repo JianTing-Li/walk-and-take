@@ -327,12 +327,13 @@ nonisolated enum Fixture {
     /// A reservation for `offer` as it looked when reserved.
     static func reservation(
         for offer: Offer, quantity: Int = 1, reservedAt: Date = sep(24, 6), collectedAt: Date? = nil,
-        cancelledAt: Date? = nil, review: Review? = nil
+        cancelledAt: Date? = nil, review: Review? = nil, rewardID: UUID? = nil
     ) -> Reservation {
         Reservation(
             id: UUID(), confirmationCode: "QW3E", quantity: quantity,
             snapshot: OfferSnapshot(offer: offer, restaurant: restaurants.first { $0.id == offer.restaurantID }!),
-            reservedAt: reservedAt, collectedAt: collectedAt, cancelledAt: cancelledAt, review: review)
+            reservedAt: reservedAt, collectedAt: collectedAt, cancelledAt: cancelledAt, review: review,
+            rewardID: rewardID)
     }
 
     static func offer(
