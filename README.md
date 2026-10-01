@@ -72,6 +72,9 @@ MVVM with one `@Observable` view model per screen. Views only render. Domain is 
 with no UI or persistence. See **[ARCHITECTURE.md](ARCHITECTURE.md)** for module rules, data flow, rollover and
 flags.
 
+Picking up the walking rewards work? Start with **[docs/HANDOFF.md](docs/HANDOFF.md)**: what was built, the decisions
+already made, how to run and test it, known risks and next steps.
+
 | Area | Built with |
 |---|---|
 | UI | SwiftUI, MapKit, CoreImage (QR) |
