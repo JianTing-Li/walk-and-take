@@ -50,6 +50,7 @@ public struct OfferDetailView: View {
                     Image(systemName: model.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(model.isFavorite ? .red : .primary)
                 }
+                .sensoryFeedback(.selection, trigger: model.isFavorite)
                 .accessibilityLabel(model.isFavorite ? "Remove from favorites" : "Add to favorites")
             }
         }
@@ -129,7 +130,7 @@ public struct OfferDetailView: View {
                     }
                 }
             }
-            Text("It's a surprise! Contents depend on what's left at the end of the morning.")
+            Text("It's a surprise! Contents depend on what the store has left.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
@@ -188,11 +189,22 @@ public struct OfferDetailView: View {
             Button {
                 Task { await reserve.reserve() }
             } label: {
-                Text(model.reserveButtonTitle)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+                Group {
+                    if reserve.isReserving {
+                        HStack(spacing: Spacing.xs) {
+                            ProgressView().tint(.white)
+                            Text("Reserving…")
+                        }
+                    } else {
+                        Text(model.reserveButtonTitle)
+                    }
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
             }
+            .sensoryFeedback(.success, trigger: reserve.confirmation != nil) { _, confirmed in confirmed }
             .buttonStyle(.borderedProminent)
             .tint(.splashTeal)
             .disabled(!model.canReserve || reserve.isReserving)

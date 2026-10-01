@@ -111,6 +111,7 @@ struct PickupView<RateSheet: View>: View {
         }
         .safeAreaInset(edge: .bottom) { bottomBar }
         .sensoryFeedback(.success, trigger: model.status == .collected)
+        .sensoryFeedback(.start, trigger: model.walk != nil) { _, started in started }
     }
 
     @ViewBuilder

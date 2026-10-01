@@ -83,7 +83,7 @@ public struct BagCard: View {
         HStack(alignment: .top) {
             StatusBadge(text: content.badgeText, isUrgent: content.isUrgent)
             if content.isAvailable {
-                Text("-\(content.savingsPercent)%")
+                Text("−\(content.savingsPercent)%")
                     .font(.caption.weight(.heavy))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Color.yolk, in: Capsule())

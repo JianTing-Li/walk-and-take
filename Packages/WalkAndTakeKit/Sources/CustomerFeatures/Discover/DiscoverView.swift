@@ -97,14 +97,11 @@ public struct DiscoverView<Destination: View>: View {
                         sortPicker
                     }
 
-                    if model.isListEmpty {
-                        EmptyStateView(
-                            "No bags right now", systemImage: "bag",
-                            message: "Check back soon. Stores add bags throughout the morning."
-                        )
-                        .padding(.top, Spacing.xxl)
+                    let sections = model.sections
+                    if sections.isEmpty {
+                        emptyState
                     } else {
-                        sections
+                        sectionsList(sections)
                     }
                 }
                 .padding(.horizontal, Spacing.l)
@@ -130,9 +127,28 @@ public struct DiscoverView<Destination: View>: View {
         }
     }
 
-    private var sections: some View {
+    /// With a category picked, the empty list is about that category, and "Show all" clears it.
+    @ViewBuilder
+    private var emptyState: some View {
+        if let category = model.category {
+            EmptyStateView(
+                "No \(category.label.lowercased()) bags right now", systemImage: category.symbol,
+                message: "Other stores near you still have bags.", actionTitle: "Show all"
+            ) { model.category = nil }
+            .padding(.top, Spacing.xxl)
+        } else {
+            EmptyStateView(
+                "No bags right now", systemImage: "bag",
+                message: "Check back soon. Stores add bags throughout the day."
+            )
+            .padding(.top, Spacing.xxl)
+        }
+    }
+
+    /// Takes the sections computed once per render (filtering and sorting aren't free).
+    private func sectionsList(_ sections: [DiscoverSection]) -> some View {
         LazyVStack(alignment: .leading, spacing: 14) {
-            ForEach(model.sections) { section in
+            ForEach(sections) { section in
                 if let title = section.title {
                     DayLabel(title, day: section.kind == .tonight ? .tonight : .tomorrow)
                         .padding(.top, section.kind == .tonight ? 0 : Spacing.xs)
@@ -166,7 +182,7 @@ private struct DiscoverHeaderView: View {
             Label("Near you · \(header.homeArea)", systemImage: "location.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.splashTeal)
-            Text("\(header.availableCount) bags to rescue within \(header.maxDistanceText) mi")
+            Text("^[\(header.availableCount) bag](inflect: true) to rescue within \(header.maxDistanceText) mi")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             if header.hiddenByPreferencesCount > 0 {

@@ -148,11 +148,13 @@ public final class PickupModel {
         guard flags.walkRewards, let walk, walk.finishedAt == nil, let snapshot = reservation?.snapshot,
             trackingStatus != .idle
         else {
-            liveProgress = nil
+            if liveProgress != nil { liveProgress = nil }
             return
         }
         let samples = await dependencies.walkTracker.samples(reservationID: reservationID)
-        liveProgress = WalkVerifier.progress(samples: samples, destination: snapshot.coordinate)
+        let progress = WalkVerifier.progress(samples: samples, destination: snapshot.coordinate)
+        // Only a real change redraws the screen.
+        if progress != liveProgress { liveProgress = progress }
         if developer.isOn {
             walkIsSimulated = await dependencies.demo.isSimulatedWalk(reservationID)
             isAutoWalking = await dependencies.demo.isAutoWalking(reservationID)
@@ -416,10 +418,14 @@ public final class PickupModel {
 
     public var summary: [(label: String, value: String)] {
         guard let reservation else { return [] }
-        var rows = [
-            ("Order", "\(reservation.quantity) × \(reservation.snapshot.bagName)"),
-            ("Pickup", PickupDayFormatter.full(reservation.snapshot.pickupWindow, now: now, calendar: calendar)),
-        ]
+        // After pickup, say when it happened rather than when to go.
+        let when: (String, String) =
+            if let collectedAt = reservation.collectedAt {
+                ("Picked up", "\(TimeText.shortDate(collectedAt, calendar: calendar)) at \(time(collectedAt))")
+            } else {
+                ("Pickup", PickupDayFormatter.full(reservation.snapshot.pickupWindow, now: now, calendar: calendar))
+            }
+        var rows = [("Order", "\(reservation.quantity) × \(reservation.snapshot.bagName)"), when]
         if reservation.rewardID != nil {
             rows.append(("Reward", "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"))
         }

@@ -107,7 +107,7 @@ struct MapBrowseView: View {
 
     private var legend: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(model.availableCount) bags within \(model.maxDistanceText) mi · tap a pin")
+            Text("^[\(model.availableCount) bag](inflect: true) within \(model.maxDistanceText) mi · tap a pin")
                 .font(.subheadline.weight(.semibold))
             HStack(spacing: 14) {
                 legendDot(.splashTeal, "Available now")

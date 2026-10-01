@@ -482,6 +482,7 @@ struct PickupWalkingTests {
         #expect(abs(walk.creditedMiles - 0.3) < 0.02)
         #expect(model.walkResultText == "+0.3 mi counted toward rewards")
         #expect(model.walkEarned != nil)
+        #expect(model.summary[1] == ("Picked up", "Thu Sep 24 at 8:00 AM"))
         #expect(!model.summary.contains { $0.label == "Walk" })  // the earned card already says it
         #expect(!harness.walkTracker.isTracking(reservation.id))
         #expect(model.trackingStatus == .idle)
@@ -612,8 +613,8 @@ struct ManageOrderModelTests {
         #expect(!model.canSave)
         #expect(model.quantityFooter == "You can hold up to 3 bags. Near Café has 1 more available.")
         #expect(model.deadlineNotice.title == "Free changes until 9:50 AM")
-        #expect(model.deadlineNotice.detail == "10 minutes before pickup ends")
-        #expect(model.pickupText == "Today · until 10:00 AM")
+        #expect(model.deadlineNotice.detail == "Changes close 10 min before pickup ends.")
+        #expect(model.pickupText == "Today · 7:30–10:00 AM")
     }
 
     @Test func minutesLeftUnderAnHour() async {

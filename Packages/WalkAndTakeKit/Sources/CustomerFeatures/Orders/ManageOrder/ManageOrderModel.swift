@@ -144,7 +144,10 @@ public final class ManageOrderModel {
         let time = TimeText.time(deadline, calendar: calendar)
         guard isOpen else { return ("Changes closed at \(time)", "The store is getting your bag ready.") }
         let minutes = max(1, Int(deadline.timeIntervalSince(now) / 60))
-        return ("Free changes until \(time)", minutes < 60 ? "\(minutes) min left" : "10 minutes before pickup ends")
+        return (
+            "Free changes until \(time)",
+            minutes < 60 ? "\(minutes) min left" : "Changes close 10 min before pickup ends."
+        )
     }
 
     public var quantityFooter: String {

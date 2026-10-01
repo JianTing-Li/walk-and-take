@@ -59,7 +59,10 @@ struct OfferCatalog: Sendable {
 
     /// "+0.7 mi toward a reward", only for bags you could still reserve.
     func walkRewardText(for offer: Offer, status: OfferAvailability.Status) -> String? {
-        guard flags.walkRewards, status.isReservable else { return nil }
+        // A store you're already at would read "+0.0 mi", so it gets no pill.
+        guard flags.walkRewards, status.isReservable,
+            WalkCopy.earnedMiles(forDistance: distanceMiles(to: offer)) >= 0.05
+        else { return nil }
         return WalkCopy.rewardPill(forDistance: distanceMiles(to: offer))
     }
 

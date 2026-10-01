@@ -16,7 +16,7 @@ public struct ImpactCard: View {
 
     public var body: some View {
         HStack(spacing: 0) {
-            stat("\(impact.bagsRescued)", "bags rescued", symbol: "bag.fill")
+            stat("\(impact.bagsRescued)", impact.bagsRescued == 1 ? "bag rescued" : "bags rescued", symbol: "bag.fill")
             Divider().frame(height: 44).overlay(Color.white.opacity(0.3))
             stat(impact.moneySaved.usd, "saved", symbol: "dollarsign.circle.fill")
             Divider().frame(height: 44).overlay(Color.white.opacity(0.3))

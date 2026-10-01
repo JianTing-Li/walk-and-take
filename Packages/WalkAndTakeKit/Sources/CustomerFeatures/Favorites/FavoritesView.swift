@@ -74,7 +74,7 @@ public struct FavoritesView<Destination: View>: View {
                 message: model.showsAlerts
                     ? "Tap the heart on any store to save it here. Turn on alerts to hear when it has bags."
                     : "Tap the heart on any store to save it here.",
-                actionTitle: "Browse stores"
+                actionTitle: "Find food nearby"
             ) { navigation.selectedTab = .discover }
         case .loaded:
             list

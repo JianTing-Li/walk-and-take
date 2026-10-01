@@ -63,14 +63,14 @@ struct PickupDayFormatterTests {
                 == "Tomorrow · 7:30–10:00 AM")
     }
 
-    @Test func shortCopyOnceOpenSaysUntil() {
+    @Test func shortCopyKeepsTheRangeOnceOpen() {
+        // One format everywhere; the card's badge says it's open.
         #expect(
             PickupDayFormatter.short(lateNight, now: Fixtures.date(21, 30), calendar: cal)
-                == "Tonight · until 11:59 PM")
+                == "Tonight · 9:00–11:59 PM")
         #expect(
             PickupDayFormatter.short(morning, now: Fixtures.date(8, 0), calendar: cal)
-                == "Today · until 10:00 AM")
-        // After it ends it goes back to the range.
+                == "Today · 7:30–10:00 AM")
         #expect(
             PickupDayFormatter.short(morning, now: Fixtures.date(10, 0), calendar: cal)
                 == "Today · 7:30–10:00 AM")
