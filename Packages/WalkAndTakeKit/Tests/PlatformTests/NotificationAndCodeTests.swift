@@ -32,6 +32,22 @@ struct NotificationPlanTests {
         #expect(NotificationPlan.identifier(forOfferID: "tpl_x-2026-09-24") == "drop-tpl_x-2026-09-24")
     }
 
+    @Test func pickupReminderCopySaysWhatToDo() {
+        let window = alert(startHour: 7).pickupWindow
+        var reminder = PickupReminder(
+            reservationID: UUID(), restaurantName: "Early Bird Bakehouse", code: "6VC7", pickupWindow: window,
+            isOpen: true)
+        #expect(NotificationPlan.title(for: reminder) == "Your bag is ready at Early Bird Bakehouse")
+        #expect(
+            NotificationPlan.body(for: reminder)
+                == "Show code 6VC7 at the counter by 9:30 AM. Walk there to earn miles.")
+        reminder.isOpen = false
+        #expect(NotificationPlan.title(for: reminder) == "Pickup at Early Bird Bakehouse opens at 7:30 AM")
+        #expect(
+            NotificationPlan.body(for: reminder)
+                == "Show code 6VC7 at the counter between 7:30–9:30 AM. Walk there to earn miles.")
+    }
+
     @Test func copyMatchesTheDraftWithMoneyFormatting() {
         let a = alert(startHour: 7)
         #expect(NotificationPlan.title(for: a) == "Early Bird Bakehouse has bags ready")

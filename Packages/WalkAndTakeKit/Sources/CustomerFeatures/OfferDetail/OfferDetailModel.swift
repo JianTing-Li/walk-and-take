@@ -25,10 +25,10 @@ public final class OfferDetailModel {
     private(set) var restaurant: Restaurant?
     /// Lifetime walked miles, for the "after this pickup" line.
     private(set) var walkMiles = 0.0
-    private var now: Date
+    private(set) var now: Date
     private let offerID: String
     private let origin: ResolvedLocation
-    private let dependencies: CustomerDependencies
+    let dependencies: CustomerDependencies
     private let navigation: CustomerNavigation
 
     /// - Parameter origin: Where distances are measured from (the list's resolved location).
@@ -45,6 +45,7 @@ public final class OfferDetailModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     /// Heart in the toolbar (favorites flag).
     public var showsFavoriteButton: Bool { flags.favorites }
     private var calendar: Calendar { NYCalendar.calendar }

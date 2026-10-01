@@ -86,5 +86,8 @@ final class SpyNotificationScheduler: NotificationScheduler {
     }
     func cancel(offerIDs: [String]) async { calls.withLock { $0.append("cancel") } }
     func cancelAll() async { calls.withLock { $0.append("cancelAll") } }
-    func sendPreview(_ alert: OfferAlert) async { calls.withLock { $0.append("preview") } }
+    func sendPreview(_ alert: OfferAlert, after delay: TimeInterval) async { calls.withLock { $0.append("preview") } }
+    func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async {
+        calls.withLock { $0.append("reminder") }
+    }
 }

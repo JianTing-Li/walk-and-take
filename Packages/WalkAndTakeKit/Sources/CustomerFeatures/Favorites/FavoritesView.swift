@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 import UIKit
 
@@ -28,6 +29,19 @@ public struct FavoritesView<Destination: View>: View {
     public var body: some View {
         NavigationStack(path: $navigation.favoritesPath) {
             content
+                .overlay(alignment: .bottomTrailing) {
+                    if model.developer.usesDemoControls {
+                        DemoMenuButton(
+                            title: "Demo · alerts arrive in 1 s",
+                            actions: model.demoAlerts.map { item in
+                                DemoAction(item.title, systemImage: "bell.badge") {
+                                    Task { await model.demoFire(item.alert) }
+                                }
+                            }
+                        )
+                        .padding(Spacing.l)
+                    }
+                }
                 .navigationTitle("Favorites")
                 .navigationDestination(for: FavoritesRoute.self, destination: destination)
                 .alert("Notifications are off", isPresented: $model.notificationsBlocked) {
@@ -84,17 +98,6 @@ public struct FavoritesView<Destination: View>: View {
                 }
             }
 
-            if model.showsAlerts {
-                Section {
-                    Button {
-                        Task { await model.sendPreview() }
-                    } label: {
-                        Label(model.previewSent ? "Alert on its way…" : "Preview an alert", systemImage: "bell.badge")
-                    }
-                } footer: {
-                    Text("Sends a sample alert in 5 seconds so you can see what it looks like.")
-                }
-            }
         }
     }
 

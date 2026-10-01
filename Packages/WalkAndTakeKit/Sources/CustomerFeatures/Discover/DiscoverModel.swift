@@ -35,7 +35,7 @@ public final class DiscoverModel {
     public let map: MapBrowseModel
 
     private(set) var catalog: OfferCatalog
-    private let dependencies: CustomerDependencies
+    let dependencies: CustomerDependencies
 
     public init(dependencies: CustomerDependencies) {
         let now = dependencies.clock.now
@@ -47,6 +47,7 @@ public final class DiscoverModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     /// Map/list toggle in the toolbar (mapBrowse flag).
     public var showsMapToggle: Bool { flags.mapBrowse }
     /// Hearts on cards (favorites flag).

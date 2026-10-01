@@ -15,13 +15,6 @@ import SwiftUI
 struct TimeTravelView: View {
     let demo: any DemoControlling
 
-    private let presets: [(label: String, hour: Int, minute: Int)] = [
-        ("Breakfast · 7:45 AM", 7, 45),
-        ("Lunch · 12:30 PM", 12, 30),
-        ("Tomorrow's bags open · 8:15 PM", 20, 15),
-        ("Just before midnight · 11:50 PM", 23, 50),
-    ]
-
     var body: some View {
         TimelineView(.animation(minimumInterval: 1)) { _ in
             let now = demo.now
@@ -33,8 +26,10 @@ struct TimeTravelView: View {
                 }
 
                 Section {
-                    ForEach(presets, id: \.label) { preset in
-                        Button(preset.label) { jump(hour: preset.hour, minute: preset.minute, from: now) }
+                    ForEach(DemoTime.presets) { preset in
+                        Button(preset.label) {
+                            if let date = DemoTime.date(preset, on: now) { demo.travel(to: date) }
+                        }
                     }
                     Button("Next day, same time") { demo.advanceTime(by: 24 * 60 * 60) }
                 } header: {
@@ -53,10 +48,4 @@ struct TimeTravelView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func jump(hour: Int, minute: Int, from now: Date) {
-        let today = NYCalendar.dayKey(for: now)
-        if let target = NYCalendar.date(on: today, hour: hour, minute: minute) {
-            demo.travel(to: target)
-        }
-    }
 }

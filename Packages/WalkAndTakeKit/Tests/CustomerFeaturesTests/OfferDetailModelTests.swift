@@ -275,6 +275,19 @@ struct OfferDetailModelTests {
         #expect(!setup.model.reserve.showsRewardToggle)
     }
 
+    // MARK: Developer mode
+
+    @Test func theDemoMenuJumpsToTheBagsPickupWindow() async throws {
+        // 7:00, before today's 7:30–10:00 window.
+        let setup = await detail(Self.todayID, at: Fixture.sep(24, 7))
+        let window = try #require(setup.model.offer?.pickupWindow)
+        #expect(setup.model.demoCanJumpToPickup)
+        setup.model.demoJumpToPickup()
+        #expect(setup.harness.clock.now == window.start)
+        setup.model.demoJumpToClosing()
+        #expect(setup.harness.clock.now == window.end.addingTimeInterval(-300))
+    }
+
     // MARK: Effect on progress
 
     func detailWithMiles(_ miles: Double) async -> OfferDetailModel {

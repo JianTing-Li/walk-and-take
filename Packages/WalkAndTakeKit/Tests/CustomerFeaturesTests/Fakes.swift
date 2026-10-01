@@ -238,7 +238,18 @@ nonisolated final class FakeNotifications: NotificationScheduler, Sendable {
     func replaceAll(with alerts: [OfferAlert], now: Date) async {}
     func cancel(offerIDs: [String]) async {}
     func cancelAll() async {}
-    func sendPreview(_ alert: OfferAlert) async { previews.withLock { $0.append(alert.offerID) } }
+    func sendPreview(_ alert: OfferAlert, after delay: TimeInterval) async {
+        previews.withLock { $0.append(alert.offerID) }
+        delays.withLock { $0.append(delay) }
+    }
+    private let delays = Mutex<[TimeInterval]>([])
+    private let reminders = Mutex<[PickupReminder]>([])
+    var sentReminders: [PickupReminder] { reminders.withLock { $0 } }
+    func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async {
+        reminders.withLock { $0.append(reminder) }
+    }
+    /// Seconds before each preview fires, in order.
+    var previewDelays: [TimeInterval] { delays.withLock { $0 } }
 }
 
 /// Wipes the fakes the way DemoDataResetter wipes the stores.

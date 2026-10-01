@@ -163,6 +163,16 @@ struct PickupView<RateSheet: View>: View {
         case .simulated(let isAutoWalking, false): actions += walkActions(isAutoWalking)
         default: break
         }
+        if model.isActive {
+            actions.append(
+                DemoAction("Send pickup reminder", systemImage: "bell.badge") {
+                    Task { await model.demoSendReminder() }
+                })
+            actions.append(
+                DemoAction("Confirm pickup now", systemImage: "checkmark.seal") {
+                    Task { await model.demoConfirmPickup() }
+                })
+        }
         if model.canOpenPickupNow {
             actions.append(
                 DemoAction("Open pickup now", systemImage: "clock.badge.checkmark") { model.openPickupNow() })

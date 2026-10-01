@@ -41,22 +41,20 @@ public final class FavoritesModel {
     public private(set) var state: State = .loading
     /// Notification permission was refused; the view offers Settings.
     public var notificationsBlocked = false
-    public private(set) var previewSent = false
 
-    private var favorites: [FavoriteRestaurant] = []
-    private var offers: [Offer] = []
-    private var restaurants: [String: Restaurant] = [:]
-    private var now: Date
-    private let dependencies: CustomerDependencies
-    private let previewResetDelay: Duration
+    private(set) var favorites: [FavoriteRestaurant] = []
+    private(set) var offers: [Offer] = []
+    private(set) var restaurants: [String: Restaurant] = [:]
+    private(set) var now: Date
+    let dependencies: CustomerDependencies
 
-    public init(dependencies: CustomerDependencies, previewResetDelay: Duration = .seconds(6)) {
+    public init(dependencies: CustomerDependencies) {
         self.dependencies = dependencies
-        self.previewResetDelay = previewResetDelay
         now = dependencies.clock.now
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     /// Bells and the preview need both the favorites and notifications flags.
     public var showsAlerts: Bool { flags.alertsEnabled }
 
@@ -117,19 +115,6 @@ public final class FavoritesModel {
         await load()
     }
 
-    /// Sends a sample alert in a few seconds so the customer can see one.
-    public func sendPreview() async {
-        guard showsAlerts, let alert = previewAlert else { return }
-        guard await dependencies.notifications.requestPermission() else {
-            notificationsBlocked = true
-            return
-        }
-        await dependencies.notifications.sendPreview(alert)
-        previewSent = true
-        try? await Task.sleep(for: previewResetDelay)
-        previewSent = false
-    }
-
     // MARK: - Output
 
     /// Open now first, then opening later, then none; alphabetical within each.
@@ -153,7 +138,7 @@ public final class FavoritesModel {
         .sorted { (rank($0.status), $0.name) < (rank($1.status), $1.name) }
     }
 
-    /// A favorite's bag if possible, otherwise any visible bag.
+    /// A favorite's bag if possible, otherwise any visible bag (Developer mode's sample alert).
     var previewAlert: OfferAlert? {
         let favoriteIDs = Set(favorites.map(\.restaurantID))
         let offer = offers.first { favoriteIDs.contains($0.restaurantID) } ?? offers.first

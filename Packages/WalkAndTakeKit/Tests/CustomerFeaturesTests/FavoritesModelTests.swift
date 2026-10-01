@@ -29,7 +29,7 @@ struct FavoritesModelTests {
         flags: FeatureFlags = Fixture.flags()
     ) async -> (FavoritesModel, Harness) {
         let harness = Harness(now: now, offers: Self.offers, favorites: favs, flags: flags)
-        let model = FavoritesModel(dependencies: harness.dependencies, previewResetDelay: .milliseconds(20))
+        let model = FavoritesModel(dependencies: harness.dependencies)
         await model.load()
         return (model, harness)
     }
@@ -81,30 +81,41 @@ struct FavoritesModelTests {
         #expect(model.rows.allSatisfy { !$0.alertsOn })
     }
 
-    @Test func previewSendsAFavoritesBagThenResets() async {
-        let (model, harness) = await favorites()
-        await model.sendPreview()
-        #expect(harness.notifications.previewOfferIDs.count == 1)
-        #expect(
-            harness.notifications.previewOfferIDs[0].hasPrefix("near")
-                || harness.notifications.previewOfferIDs[0].hasPrefix("mid"))
-        #expect(!model.previewSent)  // reset after the (short) delay
-    }
-
-    @Test func previewDeniedShowsTheAlert() async {
+    @Test func aDeniedDemoAlertShowsTheSettingsPrompt() async throws {
         let (model, harness) = await favorites()
         harness.notifications.setPermission(false)
-        await model.sendPreview()
+        await model.demoFire(try #require(model.demoAlerts.first).alert)
         #expect(model.notificationsBlocked)
         #expect(harness.notifications.previewOfferIDs.isEmpty)
+    }
+
+    // MARK: Developer mode
+
+    @Test func theDemoMenuFiresAFavoritesAlertInASecond() async throws {
+        let (model, harness) = await favorites()
+        let first = try #require(model.demoAlerts.first)
+        #expect(first.title.hasPrefix("Alert from "))
+        await model.demoFire(first.alert)
+        #expect(harness.notifications.previewOfferIDs == [first.alert.offerID])
+        #expect(harness.notifications.previewDelays == [1])
+    }
+
+    @Test func withNoFavoritesTheDemoMenuOffersASampleAlert() async {
+        let (model, _) = await favorites([])
+        #expect(model.demoAlerts.map(\.title) == ["Sample alert"])
+    }
+
+    @Test func demoAlertsFollowTheNotificationsFlag() async {
+        let (model, _) = await favorites(flags: Fixture.flags(notifications: false))
+        #expect(model.demoAlerts.isEmpty)
     }
 
     @Test func notificationsFlagOffHidesBellsAndPreview() async {
         let (model, harness) = await favorites(flags: Fixture.flags(notifications: false))
         #expect(!model.showsAlerts)
         await model.toggleAlerts(for: "mid")
-        await model.sendPreview()
         #expect(model.rows.allSatisfy { !$0.alertsOn })
+        #expect(model.demoAlerts.isEmpty)
         #expect(harness.notifications.previewOfferIDs.isEmpty)
     }
 }

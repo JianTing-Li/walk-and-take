@@ -6,6 +6,7 @@
 import DesignSystem
 import Domain
 import MapKit
+import Platform
 import SwiftUI
 
 public struct OfferDetailView: View {
@@ -30,7 +31,13 @@ public struct OfferDetailView: View {
                     actionTitle: "Try again"
                 ) { Task { await model.load() } }
             case .loaded:
-                content.safeAreaInset(edge: .bottom) { reserveBar(reserve) }
+                content
+                    .overlay(alignment: .bottomTrailing) {
+                        if model.developer.usesDemoControls {
+                            DemoMenuButton(title: "Demo · this bag", actions: demoActions).padding(Spacing.l)
+                        }
+                    }
+                    .safeAreaInset(edge: .bottom) { reserveBar(reserve) }
             }
         }
         .navigationTitle(model.restaurantName)
@@ -136,6 +143,22 @@ public struct OfferDetailView: View {
             Spacer()
             PriceStack(price: model.price, estimatedValue: model.estimatedValue, size: .title2)
         }
+    }
+
+    /// Developer mode: jump the clock to this bag's pickup window.
+    private var demoActions: [DemoAction] {
+        var actions: [DemoAction] = []
+        if model.demoCanJumpToPickup {
+            actions.append(
+                DemoAction("Jump to pickup time", systemImage: "clock.badge.checkmark") { model.demoJumpToPickup() })
+        }
+        if model.demoCanJumpToClosing {
+            actions.append(
+                DemoAction("Jump to 5 min before pickup ends", systemImage: "hourglass.bottomhalf.filled") {
+                    model.demoJumpToClosing()
+                })
+        }
+        return actions
     }
 
     private func reserveBar(_ reserve: ReserveModel) -> some View {

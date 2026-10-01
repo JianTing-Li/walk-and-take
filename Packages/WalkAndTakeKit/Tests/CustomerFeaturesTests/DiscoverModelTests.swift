@@ -250,4 +250,17 @@ struct DiscoverModelTests {
         #expect(model.sections.flatMap(\.items).allSatisfy { $0.card.walkRewardText == nil })
     }
 
+    // MARK: Developer mode
+
+    @Test func theDemoMenuJumpsToWhenBagsOpenAndBack() async throws {
+        let (model, harness) = await loaded(at: Fixture.sep(24, 8))
+        #expect(model.demoTimeJumps.map(\.title).first == "Breakfast · 7:45 AM")
+        let tomorrowsBags = try #require(model.demoTimeJumps.first { $0.title.hasPrefix("Tomorrow") })
+        model.demoTravel(to: tomorrowsBags.date)
+        #expect(harness.clock.now == Fixture.sep(24, 20, 15))
+        #expect(model.demoCanResetTime)
+        model.demoResetTime()
+        #expect(harness.clock.isLive)
+        #expect(!model.demoCanResetTime)
+    }
 }

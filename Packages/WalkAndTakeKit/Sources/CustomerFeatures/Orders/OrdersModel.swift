@@ -28,9 +28,9 @@ public final class OrdersModel {
     }
 
     public private(set) var state: State = .loading
-    private var reservations: [Reservation] = []
-    private var now: Date
-    private let dependencies: CustomerDependencies
+    private(set) var reservations: [Reservation] = []
+    private(set) var now: Date
+    let dependencies: CustomerDependencies
 
     public init(dependencies: CustomerDependencies) {
         self.dependencies = dependencies
@@ -38,6 +38,7 @@ public final class OrdersModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     /// Impact card at the top (impact flag).
     public var showsImpact: Bool { flags.impact }
 
@@ -77,7 +78,7 @@ public final class OrdersModel {
 
     // MARK: - Output
 
-    private var active: [Reservation] {
+    var active: [Reservation] {
         reservations.filter { ReservationPolicy.isActive($0, at: now) }
     }
 

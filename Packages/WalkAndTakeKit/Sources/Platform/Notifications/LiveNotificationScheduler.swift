@@ -56,12 +56,26 @@ public struct LiveNotificationScheduler: NotificationScheduler {
         center.removeAllPendingNotificationRequests()
     }
 
-    public func sendPreview(_ alert: OfferAlert) async {
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: NotificationPlan.previewDelay, repeats: false)
+    public func sendPreview(_ alert: OfferAlert, after delay: TimeInterval) async {
+        // The trigger needs a positive interval; one second is "now" for a banner.
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, delay), repeats: false)
         let request = UNNotificationRequest(
             identifier: NotificationPlan.previewPrefix + UUID().uuidString,
             content: Self.content(for: alert),
             trigger: trigger
+        )
+        try? await center.add(request)
+    }
+
+    public func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async {
+        let content = UNMutableNotificationContent()
+        content.title = NotificationPlan.title(for: reminder)
+        content.body = NotificationPlan.body(for: reminder)
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: NotificationPlan.reminderPrefix + reminder.reservationID.uuidString,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: max(1, delay), repeats: false)
         )
         try? await center.add(request)
     }

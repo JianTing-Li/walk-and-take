@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 import UIKit
 
@@ -34,6 +35,11 @@ public struct DiscoverView<Destination: View>: View {
                     MapBrowseView(model: model.map) { navigation.discoverPath.append(.offer(id: $0)) }
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if model.developer.usesDemoControls {
+                    DemoMenuButton(title: "Demo · jump to", actions: demoActions).padding(Spacing.l)
+                }
+            }
             .navigationTitle(model.mode == .map ? "Map" : "Discover")
             .navigationBarTitleDisplayMode(model.mode == .map ? .inline : .automatic)
             .toolbar {
@@ -50,6 +56,18 @@ public struct DiscoverView<Destination: View>: View {
         }
         .tint(.splashTeal)
         .task { await model.run() }
+    }
+
+    /// Developer mode: jump the clock to when bags open, or back to now.
+    private var demoActions: [DemoAction] {
+        var actions = model.demoTimeJumps.map { jump in
+            DemoAction(jump.title, systemImage: "clock") { model.demoTravel(to: jump.date) }
+        }
+        if model.demoCanResetTime {
+            actions.append(
+                DemoAction("Back to live time", systemImage: "clock.arrow.circlepath") { model.demoResetTime() })
+        }
+        return actions
     }
 
     // MARK: - List

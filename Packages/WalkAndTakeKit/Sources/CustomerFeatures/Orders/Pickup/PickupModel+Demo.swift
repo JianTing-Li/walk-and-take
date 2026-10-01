@@ -64,6 +64,23 @@ extension PickupModel {
         dependencies.demo.travel(to: window.start)
     }
 
+    /// Sends this order's "your bag is ready" notification in a second.
+    public func demoSendReminder() async {
+        guard developer.isOn, isActive, let reservation else { return }
+        guard await dependencies.notifications.requestPermission() else { return }
+        await dependencies.notifications.sendReminder(
+            PickupReminder(reservation, now: now), after: PickupReminder.demoDelay)
+    }
+
+    /// Confirms pickup without the swipe, opening the window first if it hasn't yet.
+    public func demoConfirmPickup() async {
+        guard developer.isOn, isActive, let window = reservation?.snapshot.pickupWindow else { return }
+        if status == .upcoming {
+            dependencies.demo.travel(to: window.start)
+        }
+        await collect()
+    }
+
     /// Jump to 5 minutes before the window closes, to show the closing countdown.
     public var canJumpToClosing: Bool {
         guard developer.isOn, isActive, let window = reservation?.snapshot.pickupWindow else { return false }

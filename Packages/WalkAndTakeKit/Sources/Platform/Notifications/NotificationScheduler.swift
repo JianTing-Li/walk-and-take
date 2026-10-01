@@ -60,14 +60,43 @@ public protocol NotificationScheduler: Sendable {
     /// Removes every pending alert, including previews.
     func cancelAll() async
 
-    /// Sends a sample alert a few seconds from now so you can see what one looks like.
-    func sendPreview(_ alert: OfferAlert) async
+    /// Sends an alert `delay` seconds from now, e.g. a sample so you can see what one looks like.
+    func sendPreview(_ alert: OfferAlert, after delay: TimeInterval) async
+
+    /// Reminds the customer to pick up a reserved bag, `delay` seconds from now.
+    func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async
+}
+
+/// "Your bag is ready" for one order.
+public struct PickupReminder: Hashable, Sendable {
+    public var reservationID: UUID
+    public var restaurantName: String
+    public var code: String
+    public var pickupWindow: PickupWindow
+    /// The window is open now; otherwise the reminder says when it opens.
+    public var isOpen: Bool
+
+    public init(reservationID: UUID, restaurantName: String, code: String, pickupWindow: PickupWindow, isOpen: Bool) {
+        self.reservationID = reservationID
+        self.restaurantName = restaurantName
+        self.code = code
+        self.pickupWindow = pickupWindow
+        self.isOpen = isOpen
+    }
+}
+
+extension NotificationScheduler {
+    /// A sample alert a few seconds from now, so there's time to leave the app and watch it arrive.
+    public func sendPreview(_ alert: OfferAlert) async {
+        await sendPreview(alert, after: NotificationPlan.previewDelay)
+    }
 }
 
 /// Identifiers and copy shared by the live scheduler and tests.
 public enum NotificationPlan {
     public static let dropPrefix = "drop-"
     public static let previewPrefix = "preview-"
+    public static let reminderPrefix = "reminder-"
     public static let previewDelay: TimeInterval = 5
 
     public static func identifier(forOfferID offerID: String) -> String {
@@ -93,6 +122,23 @@ public enum NotificationPlan {
             offers
             .filter { alerting.contains($0.restaurantID) && !$0.isSoldOut && $0.pickupWindow.start > now }
             .compactMap { offer in names[offer.restaurantID].map { OfferAlert(offer: offer, restaurantName: $0) } }
+    }
+
+    /// "Your bag is ready at Rye & Rail" or "Pickup at Rye & Rail opens at 12:00 PM"
+    public static func title(for reminder: PickupReminder) -> String {
+        reminder.isOpen
+            ? "Your bag is ready at \(reminder.restaurantName)"
+            : "Pickup at \(reminder.restaurantName) opens at \(TimeText.time(reminder.pickupWindow.start, calendar: NYCalendar.calendar))"
+    }
+
+    /// "Show code 6VC7 at the counter by 2:00 PM. Walk there to earn miles."
+    public static func body(for reminder: PickupReminder) -> String {
+        let calendar = NYCalendar.calendar
+        let when =
+            reminder.isOpen
+            ? "by \(TimeText.time(reminder.pickupWindow.end, calendar: calendar))"
+            : "between \(TimeText.range(reminder.pickupWindow, calendar: calendar))"
+        return "Show code \(reminder.code) at the counter \(when). Walk there to earn miles."
     }
 
     public static func title(for alert: OfferAlert) -> String {

@@ -369,6 +369,23 @@ struct PickupWalkingTests {
         #expect(model.demoWalkControls == .live)
     }
 
+    @Test func theOrderScreenSendsItsPickupReminder() async throws {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        harness.developer.isOn = true
+        await model.demoSendReminder()
+        let sent = try #require(harness.notifications.sentReminders.first)
+        #expect(sent.reservationID == reservation.id)
+        #expect(sent.isOpen)
+    }
+
+    @Test func confirmPickupNowOpensTheWindowAndCompletesThePickup() async {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
+        harness.developer.isOn = true
+        await model.demoConfirmPickup()
+        #expect(harness.clock.now == reservation.snapshot.pickupWindow.start)
+        #expect(model.status == .collected)
+    }
+
     @Test func openPickupNowMovesTheClockToTheWindow() async {
         let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
         harness.developer.isOn = true

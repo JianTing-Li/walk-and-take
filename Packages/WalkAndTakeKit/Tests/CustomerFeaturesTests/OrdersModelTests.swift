@@ -29,6 +29,18 @@ struct OrdersModelTests {
         return (model, harness)
     }
 
+    @Test func theDemoMenuSendsAPickupReminderPerActiveOrder() async throws {
+        let (model, harness) = await orders(at: Fixture.sep(24, 8)) {
+            $0.add(Fixture.reservation(for: Self.breakfast))
+            $0.add(Fixture.reservation(for: Self.dinner))
+        }
+        #expect(model.demoReminders.map(\.title).count == 2)
+        let first = try #require(model.demoReminders.first)
+        #expect(first.reminder.isOpen)  // breakfast is open at 8:00
+        await model.demoSend(first.reminder)
+        #expect(harness.notifications.sentReminders == [first.reminder])
+    }
+
     @Test func emptyState() async {
         let (model, _) = await orders(at: Fixture.sep(24, 8)) { _ in }
         #expect(model.state == .empty)
