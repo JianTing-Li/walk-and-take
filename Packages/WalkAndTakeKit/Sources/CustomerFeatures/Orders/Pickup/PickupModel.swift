@@ -40,6 +40,10 @@ public final class PickupModel {
     /// What a finished, credited walk added to the customer's miles. Worked out from their walk history,
     /// so it's the same right after pickup and whenever the order is opened later.
     public private(set) var earnings: WalkEarnings?
+    /// Progress checks in a row with no usable fix. After a few, the card suggests keeping the app open.
+    private var emptyPolls = 0
+    /// About 30 s of polling (every 3 s).
+    static let noFixHintAfterPolls = 10
     /// Stars tapped on the rating card; presents the rating sheet.
     public var rateRequest: RateRequest?
 
@@ -142,6 +146,7 @@ public final class PickupModel {
         }
         let samples = await dependencies.walkTracker.samples(reservationID: reservationID)
         liveProgress = WalkVerifier.progress(samples: samples, destination: snapshot.coordinate)
+        emptyPolls = liveProgress == nil ? emptyPolls + 1 : 0
         trackingStatus = await dependencies.walkTracker.status(reservationID: reservationID)
     }
 
@@ -295,15 +300,25 @@ public final class PickupModel {
         case walking(Walking)
 
         public struct Walking: Hashable, Sendable {
+            public enum Phase: Hashable, Sendable {
+                /// On the way (or waiting for a location).
+                case walking
+                /// At the door before the pickup window opens.
+                case arrivedEarly
+                /// At the door with the window open: the card shrinks so the code and swipe show.
+                case arrived
+            }
+
+            public var phase: Phase
             public var title: String
-            public var detail: String
+            public var detail: String?
             public var warning: String?
-            /// 0...1 along the route. Nil until there are two usable fixes.
-            public var fraction: Double?
+            /// 0...1 along the route; 0 until there are two usable fixes.
+            public var fraction: Double
+            /// Tick marks on the bar, 0...1.
+            public var ticks: [Double]
             /// "0.3 mi walked · 0.2 mi to go", or what we're waiting for.
             public var progressText: String
-            /// "Counting +0.30 mi so far", once some of the walk counts.
-            public var countingText: String?
         }
     }
 
@@ -320,15 +335,7 @@ public final class PickupModel {
     public var walkSection: WalkSection? {
         guard flags.walkRewards, isActive, let reservation, let distance = walkDistance else { return nil }
         if let walk, walk.finishedAt == nil {
-            return .walking(
-                .init(
-                    title: "Walk in progress",
-                    detail: "Started at \(time(walk.startedAt)). Swipe to confirm pickup when you arrive.",
-                    warning: trackingStatus == .locationOff
-                        ? "Location is off, so your miles can't be counted. Turn it on in Settings." : nil,
-                    fraction: liveProgress?.fraction,
-                    progressText: liveProgress.map(WalkCopy.progressText) ?? "Waiting for your first location…",
-                    countingText: liveProgress.flatMap(WalkCopy.countingText)))
+            return .walking(walking(walk, reservation: reservation, distance: distance))
         }
         if canStartWalk {
             return .ready(
@@ -339,6 +346,38 @@ public final class PickupModel {
         }
         guard walk == nil, now < WalkPolicy.startOpensAt(for: reservation) else { return nil }
         return .opensLater("Start walk opens at \(time(WalkPolicy.startOpensAt(for: reservation)))")
+    }
+
+    /// The walk card while recording: on the way, here early, or here with the window open.
+    private func walking(_ walk: Walk, reservation: Reservation, distance: Double) -> WalkSection.Walking {
+        let ticks = WalkCopy.walkTicks(forDistance: distance)
+        let opens = time(reservation.snapshot.pickupWindow.start)
+        // With location off the recording can't be trusted, so it stays "walking" with the warning.
+        if let progress = liveProgress, trackingStatus != .locationOff, WalkCopy.isAtDoor(progress) {
+            if status == .upcoming {
+                return .init(
+                    phase: .arrivedEarly, title: "You've arrived",
+                    detail: "You're here early. Pickup opens at \(opens) — your miles are saved.",
+                    fraction: 1, ticks: ticks, progressText: WalkCopy.walkedText(progress))
+            }
+            return .init(
+                phase: .arrived, title: "\(WalkCopy.walkedText(progress)) · swipe below to confirm",
+                fraction: 1, ticks: ticks, progressText: WalkCopy.walkedText(progress))
+        }
+        let started = "Started at \(time(walk.startedAt))."
+        let waitingTooLong = liveProgress == nil && emptyPolls >= Self.noFixHintAfterPolls
+        let warning: String? =
+            switch trackingStatus {
+            case .locationOff: "Location is off, so your miles can't be counted. Turn it on in Settings."
+            default: waitingTooLong ? "No location yet. Keep Walk & Take open while you walk." : nil
+            }
+        return .init(
+            phase: .walking, title: "Walk in progress",
+            detail: status == .upcoming
+                ? "\(started) Pickup opens at \(opens)." : "\(started) Swipe to confirm pickup when you arrive.",
+            warning: warning,
+            fraction: liveProgress?.fraction ?? 0, ticks: ticks,
+            progressText: liveProgress.map(WalkCopy.progressText) ?? "Waiting for your first location…")
     }
 
     /// The "miles earned" celebration after a credited walk. Nil for other pickups or with the flag off.

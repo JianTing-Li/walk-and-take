@@ -52,13 +52,17 @@ public struct ProfileView: View {
         Form {
             if let walkProgress = model.walkProgress {
                 Section {
-                    WalkProgressCard(walkProgress)
+                    WalkProgressCard(walkProgress) { navigation.profilePath.append(.rewards) }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
-                    NavigationLink(value: ProfileRoute.rewards) {
-                        Label("Rewards", systemImage: "gift")
+                        .accessibilityIdentifier("profile.walkProgress")
+                    // With rewards ready, the card's button opens the list; otherwise this row does.
+                    if walkProgress.readyText == nil {
+                        NavigationLink(value: ProfileRoute.rewards) {
+                            Label("Rewards", systemImage: "gift")
+                        }
+                        .accessibilityIdentifier("profile.rewards")
                     }
-                    .accessibilityIdentifier("profile.rewards")
                     NavigationLink(value: ProfileRoute.walkHistory) {
                         Label("Walk history", systemImage: "list.bullet.rectangle")
                     }

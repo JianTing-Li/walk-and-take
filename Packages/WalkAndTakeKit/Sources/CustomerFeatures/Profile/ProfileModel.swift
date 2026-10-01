@@ -145,13 +145,17 @@ public final class ProfileModel {
     public var walkProgress: WalkProgressCard.Content? {
         guard flags.walkRewards else { return nil }
         let next = WalkRewardLadder.nextMilestone(after: walkMiles)
+        let reached = WalkRewardLadder.milestonesReached(totalMiles: walkMiles)
+        let previous = reached == 0 ? 0 : WalkRewardLadder.milestone(at: reached - 1)
         let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
         let ready = availableRewards
         return WalkProgressCard.Content(
             milesText: "\(WalkCopy.miles(walkMiles)) mi",
             milesCaption: "walked to pickups",
             progress: WalkRewardLadder.progressFraction(totalMiles: walkMiles),
-            targetTitle: WalkRewardLadder.milestonesReached(totalMiles: walkMiles) == 0
+            // A tick per mile between milestones; quarter miles on the way to the first one.
+            ticks: MilestoneProgressBar.ticks(from: previous, to: next, every: next - previous <= 1 ? 0.25 : 1),
+            targetTitle: reached == 0
                 ? "First reward: \(discount) at \(WalkCopy.milestone(next)) mi"
                 : "Next: \(discount) at \(WalkCopy.milestone(next)) mi",
             targetDetail: "\(WalkCopy.miles(WalkRewardLadder.milesToNext(totalMiles: walkMiles))) mi to go",

@@ -92,17 +92,24 @@ enum WalkCopy {
 
     // MARK: Live progress
 
-    /// "0.3 mi walked · 0.2 mi to go", or "You've arrived" once at the door.
-    static func progressText(_ progress: WalkProgress) -> String {
-        let arrived = progress.milesToGo * 1609.344 <= WalkVerifier.endRadiusMiles * 1609.344
-        let walked = "\(miles(progress.creditedMiles)) mi walked"
-        return arrived
-            ? "\(walked) · You're at the door" : "\(walked) · \(miles(progress.milesToGo)) mi to go"
+    /// At the door: within the radius the final check accepts as "arrived".
+    static func isAtDoor(_ progress: WalkProgress) -> Bool {
+        progress.milesToGo <= WalkVerifier.endRadiusMiles
     }
 
-    /// "Counting +0.30 mi so far" once some of the walk counts.
-    static func countingText(_ progress: WalkProgress) -> String? {
-        progress.creditedMiles > 0 ? "Counting +\(miles(progress.creditedMiles)) mi so far" : nil
+    /// "0.3 mi walked"
+    static func walkedText(_ progress: WalkProgress) -> String {
+        "\(miles(progress.creditedMiles)) mi walked"
+    }
+
+    /// "0.3 mi walked · 0.2 mi to go"
+    static func progressText(_ progress: WalkProgress) -> String {
+        "\(walkedText(progress)) · \(miles(progress.milesToGo)) mi to go"
+    }
+
+    /// Tick marks every 0.1 mi along a walk (every 0.25 mi past a mile), as 0...1 positions.
+    static func walkTicks(forDistance distance: Double) -> [Double] {
+        MilestoneProgressBar.ticks(from: 0, to: distance, every: distance <= 1 ? 0.1 : 0.25)
     }
 
     // MARK: Earned

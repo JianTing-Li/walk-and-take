@@ -24,6 +24,10 @@ struct ComponentRenderTests {
     }
 
     static let components: [(String, AnyView)] = [
+        (
+            "MilestoneProgressBar",
+            AnyView(MilestoneProgressBar(value: 0.4, ticks: [0.25, 0.5], fill: .yolk, track: .gray))
+        ),
         ("BagCard", AnyView(BagCard(PreviewSamples.bagCard, isFavorite: true) {})),
         ("BagCardFarther", AnyView(BagCard(PreviewSamples.bagCardFarther) {})),
         ("BagCardSoldOut", AnyView(BagCard(PreviewSamples.bagCardSoldOut))),

@@ -197,8 +197,9 @@ struct PickupWalkingTests {
             Issue.record("expected a walking section, got \(String(describing: model.walkSection))")
             return
         }
-        #expect(walking.title == "Walk in progress")
-        #expect(walking.detail == "Started at 7:00 AM. Swipe to confirm pickup when you arrive.")
+        // The scripted track already ends at the door, before the 7:30 window opens.
+        #expect(walking.phase == .arrivedEarly)
+        #expect(walking.title == "You've arrived")
         #expect(walking.warning == nil)
         #expect(try await harness.walkRewards.walk(reservationID: reservation.id) != nil)
     }
@@ -253,9 +254,11 @@ struct PickupWalkingTests {
         harness.walkTracker.script(Array(Self.track().prefix(3)))  // a third of the way
         await model.startWalk()
         let walking = try #require(walkingContent(model))
+        #expect(walking.phase == .walking)
         #expect(walking.progressText == "0.1 mi walked · 0.2 mi to go")
-        #expect(walking.countingText == "Counting +0.1 mi so far")
-        #expect(abs((walking.fraction ?? 0) - 1.0 / 3) < 0.02)
+        #expect(abs(walking.fraction - 1.0 / 3) < 0.02)
+        #expect(walking.detail == "Started at 8:00 AM. Swipe to confirm pickup when you arrive.")
+        #expect(!walking.ticks.isEmpty)  // a tick every 0.1 mi
     }
 
     @Test func progressAdvancesAsFixesArrive() async throws {
@@ -268,12 +271,34 @@ struct PickupWalkingTests {
         #expect(walking.progressText == "0.2 mi walked · 0.1 mi to go")
     }
 
-    @Test func arrivingSaysYouAreAtTheDoor() async throws {
+    @Test func arrivingWhileOpenShrinksToOneLine() async throws {
         let (model, _, _) = await pickup(at: Fixture.sep(24, 8))
         await model.startWalk()  // the full track ends at the door
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.3 mi walked · You're at the door")
-        #expect((walking.fraction ?? 0) > 0.99)
+        #expect(walking.phase == .arrived)
+        #expect(walking.title == "0.3 mi walked · swipe below to confirm")
+        #expect(walking.detail == nil)
+        #expect(walking.fraction == 1)
+    }
+
+    @Test func arrivingBeforeTheWindowOpensSaysYouAreEarly() async throws {
+        // 7:00, window opens at 7:30; Start walk opened at 6:30.
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 7))
+        await model.startWalk()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.phase == .arrivedEarly)
+        #expect(walking.title == "You've arrived")
+        #expect(walking.detail == "You're here early. Pickup opens at 7:30 AM — your miles are saved.")
+        #expect(walking.progressText == "0.3 mi walked")
+    }
+
+    @Test func walkingBeforeTheWindowSaysWhenPickupOpens() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 7))
+        harness.walkTracker.script(Array(Self.track().prefix(3)))
+        await model.startWalk()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.phase == .walking)
+        #expect(walking.detail == "Started at 7:00 AM. Pickup opens at 7:30 AM.")
     }
 
     @Test func waitsForAFirstLocation() async throws {
@@ -282,8 +307,17 @@ struct PickupWalkingTests {
         await model.startWalk()
         let walking = try #require(walkingContent(model))
         #expect(walking.progressText == "Waiting for your first location…")
-        #expect(walking.fraction == nil)
-        #expect(walking.countingText == nil)
+        #expect(walking.fraction == 0)  // the bar still shows, empty
+        #expect(walking.warning == nil)
+    }
+
+    @Test func aLongWaitForALocationSuggestsKeepingTheAppOpen() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkTracker.script([])
+        await model.startWalk()
+        for _ in 0..<PickupModel.noFixHintAfterPolls { await model.refreshLiveProgress() }
+        let walking = try #require(walkingContent(model))
+        #expect(walking.warning == "No location yet. Keep Walk & Take open while you walk.")
     }
 
     @Test func progressClearsOnceThePickupIsConfirmed() async {

@@ -88,7 +88,7 @@ enum PreviewSamples {
         unlock: "Reward unlocked: 50% off one bag")
 
     static let walkProgress = WalkProgressCard.Content(
-        milesText: "1.2 mi", milesCaption: "walked to pickups", progress: 0.05,
+        milesText: "1.2 mi", milesCaption: "walked to pickups", progress: 0.05, ticks: [0.25, 0.5, 0.75],
         targetTitle: "Next: 50% off one bag at 5 mi", targetDetail: "3.8 mi to go",
         readyText: "1 reward ready to use")
 

@@ -128,33 +128,7 @@ struct PickupView<RateSheet: View>: View {
                 .accessibilityIdentifier("pickup.startWalk")
             }
         case .walking(let walking):
-            VStack(alignment: .leading, spacing: 6) {
-                Label(walking.title, systemImage: "figure.walk.motion")
-                    .font(.headline)
-                    .foregroundStyle(Color.splashTeal)
-                if let fraction = walking.fraction {
-                    ProgressView(value: fraction)
-                        .tint(Color.splashTeal)
-                        .accessibilityHidden(true)
-                }
-                Text(walking.progressText)
-                    .font(.subheadline.weight(.semibold))
-                    .accessibilityIdentifier("pickup.walkProgress")
-                if let counting = walking.countingText {
-                    Text(counting).font(.footnote.weight(.semibold)).foregroundStyle(Color.splashTeal)
-                }
-                Text(walking.detail).font(.subheadline).foregroundStyle(.secondary)
-                if let warning = walking.warning {
-                    Label(warning, systemImage: "location.slash.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.orange)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Spacing.l)
-            .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("pickup.walkInProgress")
+            WalkingCard(walking: walking)
         }
     }
 
@@ -217,5 +191,54 @@ extension PickupStatusPill.Tone {
         case .collected: .green
         case .inactive: .secondary
         }
+    }
+}
+
+/// The walk card while recording. Shrinks to one line once you're at the door and can confirm.
+private struct WalkingCard: View {
+    let walking: PickupModel.WalkSection.Walking
+
+    var body: some View {
+        Group {
+            if walking.phase == .arrived {
+                Label(walking.title, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.splashTeal)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.m)
+            } else {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Label(
+                        walking.title,
+                        systemImage: walking.phase == .arrivedEarly ? "checkmark.circle.fill" : "figure.walk.motion"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(Color.splashTeal)
+                    MilestoneProgressBar(
+                        value: walking.fraction, ticks: walking.ticks, fill: .splashTeal,
+                        track: Color.splashTeal.opacity(0.15)
+                    )
+                    .padding(.vertical, Spacing.xxs)
+                    Text(walking.progressText)
+                        .font(.subheadline.weight(.semibold))
+                        .contentTransition(.numericText())
+                        .accessibilityIdentifier("pickup.walkProgress")
+                    if let detail = walking.detail {
+                        Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if let warning = walking.warning {
+                        Label(warning, systemImage: "location.slash.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Spacing.l)
+            }
+        }
+        .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
+        .animation(.default, value: walking)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("pickup.walkInProgress")
     }
 }

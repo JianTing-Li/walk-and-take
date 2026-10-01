@@ -165,6 +165,7 @@ struct ProfileModelTests {
         #expect(card.targetTitle == "First reward: 50% off one bag at 1 mi")
         #expect(card.targetDetail == "1.0 mi to go")
         #expect(card.progress == 0)
+        #expect(card.ticks == [0.25, 0.5, 0.75])  // quarter miles on the way to 1 mi
         #expect(card.readyText == nil)
     }
 
@@ -175,6 +176,7 @@ struct ProfileModelTests {
         #expect(card.targetTitle == "Next: 50% off one bag at 5 mi")
         #expect(card.targetDetail == "3.8 mi to go")
         #expect(abs(card.progress - 0.05) < 1e-9)
+        #expect(card.ticks == [0.25, 0.5, 0.75])  // 2, 3 and 4 mi between 1 and 5
         #expect(card.readyText == "1 reward ready to use")
         #expect(model.availableRewards == 1)
     }
