@@ -19,11 +19,9 @@ import SwiftUI
 final class AppDependencies {
     let role: UserRole = .customer
     let flags: FeatureFlags
-    let clock: any Clock
-    #if DEBUG
-        /// The same clock as `clock`, exposed for time travel.
-        let debugClock: AdjustableClock
-    #endif
+    /// Live unless Developer mode's time travel (or a UI test) moves it.
+    let clock: AdjustableClock
+    let developer: DeveloperSettings
 
     let marketplace: MarketplaceStore
     let userData: UserDataStore
@@ -49,10 +47,12 @@ final class AppDependencies {
         flags = .default
         #if DEBUG
             let options = LaunchOptions.current
-            debugClock = options.fixedNow.map(AdjustableClock.init(fixedAt:)) ?? AdjustableClock()
-            clock = debugClock
+            clock = options.fixedNow.map(AdjustableClock.init(fixedAt:)) ?? AdjustableClock()
+            // UI tests start from clean switches instead of whatever the simulator last had.
+            developer = DeveloperSettings(defaults: options.inMemoryStore ? Self.freshTestDefaults() : .standard)
         #else
-            clock = LiveClock()
+            clock = AdjustableClock()
+            developer = DeveloperSettings()
         #endif
 
         let seed: Seed
@@ -72,12 +72,12 @@ final class AppDependencies {
 
         marketplace = MarketplaceStore(modelContainer: container, seed: seed)
         userData = UserDataStore(modelContainer: container)
+        let deviceLocation = DeveloperLocationProvider(
+            device: DeviceLocationProvider(source: CoreLocationSource()), settings: developer)
         #if DEBUG
-            location =
-                options.fixedLocation
-                ? FixedLocationProvider() : DeviceLocationProvider(source: CoreLocationSource())
+            location = options.fixedLocation ? FixedLocationProvider() : deviceLocation
         #else
-            location = DeviceLocationProvider(source: CoreLocationSource())
+            location = deviceLocation
         #endif
         #if DEBUG
             walkTracker =
@@ -92,11 +92,6 @@ final class AppDependencies {
             alertsEnabled: flags.alertsEnabled)
         resetter = DemoDataResetter(
             marketplace: marketplace, userData: userData, notifications: notifications, clock: clock)
-        #if DEBUG
-            let developerDestination = Self.developerTools(clock: debugClock, offers: marketplace)
-        #else
-            let developerDestination: ((ProfileRoute) -> AnyView)? = nil
-        #endif
         screens = CustomerScreens(
             dependencies: CustomerDependencies(
                 offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
@@ -104,23 +99,18 @@ final class AppDependencies {
                 notifications: notifications,
                 resetter: resetter,
                 clock: clock,
-                flags: flags),
-            navigation: navigation,
-            developerDestination: developerDestination)
+                flags: flags,
+                developer: developer,
+                demo: DemoController(clock: clock)),
+            navigation: navigation)
     }
 
     #if DEBUG
-        /// Profile's Developer section: debug builds only.
-        private static func developerTools(
-            clock: AdjustableClock, offers: any OfferRepository
-        ) -> (ProfileRoute) -> AnyView {
-            { route in
-                switch route {
-                case .timeTravel: AnyView(TimeTravelView(clock: clock))
-                case .seedMap: AnyView(SeedMapView(offers: offers))
-                case .walkHistory, .rewards: AnyView(EmptyView())  // Profile shows these itself
-                }
-            }
+        /// A UserDefaults suite emptied on every UI-test launch.
+        private static func freshTestDefaults() -> UserDefaults {
+            let name = "org.pursuit.Walk-And-Take.uitest"
+            UserDefaults().removePersistentDomain(forName: name)
+            return UserDefaults(suiteName: name) ?? .standard
         }
     #endif
 

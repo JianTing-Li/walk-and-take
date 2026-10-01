@@ -11,15 +11,10 @@ import SwiftUI
 public struct ProfileView: View {
     @Bindable var model: ProfileModel
     @Bindable var navigation: CustomerNavigation
-    let developerDestination: ((ProfileRoute) -> AnyView)?
 
-    public init(
-        model: ProfileModel, navigation: CustomerNavigation,
-        developerDestination: ((ProfileRoute) -> AnyView)? = nil
-    ) {
+    public init(model: ProfileModel, navigation: CustomerNavigation) {
         self.model = model
         self.navigation = navigation
-        self.developerDestination = developerDestination
     }
 
     public var body: some View {
@@ -40,7 +35,8 @@ public struct ProfileView: View {
                 switch route {
                 case .walkHistory: WalkHistoryView(model: model.makeWalkHistory())
                 case .rewards: RewardsListView(model: model.makeRewardsList())
-                default: developerDestination?(route) ?? AnyView(EmptyView())
+                case .timeTravel: TimeTravelView(demo: model.demo)
+                case .seedMap: SeedMapView(offers: model.offers)
                 }
             }
         }
@@ -108,8 +104,7 @@ public struct ProfileView: View {
 
             if model.showsDietary { dietarySection }
             if model.showsCommute { CommuteSection(model: model) }
-            resetSection
-            if developerDestination != nil { developerSection }
+            developerSection
         }
     }
 
@@ -133,51 +128,65 @@ public struct ProfileView: View {
         }
     }
 
-    /// DEBUG only: the app passes these tools in debug builds.
+    /// Developer mode, last on the screen in every build. Its tools expand under the switch while it's on.
     private var developerSection: some View {
         Section {
-            NavigationLink(value: ProfileRoute.timeTravel) {
-                Label("Time travel", systemImage: "clock.arrow.2.circlepath")
+            Toggle(
+                isOn: Binding(get: { model.developer.isOn }, set: { model.setDeveloperMode($0) }).animation()
+            ) {
+                Label("Developer mode", systemImage: "hammer")
             }
-            NavigationLink(value: ProfileRoute.seedMap) {
-                Label("Seed map", systemImage: "map")
+            .accessibilityIdentifier("profile.developerMode")
+            if model.developer.isOn {
+                Toggle(isOn: Bindable(model.developer).fixedLocation) {
+                    Label("Fixed location", systemImage: "location.fill")
+                }
+                .accessibilityIdentifier("developer.fixedLocation")
+                NavigationLink(value: ProfileRoute.timeTravel) {
+                    Label("Time travel", systemImage: "clock.arrow.2.circlepath")
+                }
+                NavigationLink(value: ProfileRoute.seedMap) {
+                    Label("Seed map", systemImage: "map")
+                }
+                resetButton
             }
         } header: {
             Text("Developer")
         } footer: {
-            Text("Debug builds only.")
+            Text(
+                model.developer.isOn
+                    ? "Fixed location puts you at the center of Long Island City. Reset demo data starts over "
+                        + "with fresh bags from every store. Turning Developer mode off puts every setting here "
+                        + "back to normal."
+                    : "Shows demo tools for walking through the app: time travel, a fixed location and demo data.")
         }
     }
 
-    private var resetSection: some View {
-        Section {
-            Button(role: .destructive) {
-                model.confirmingReset = true
-            } label: {
-                HStack {
-                    Label("Reset demo data", systemImage: "arrow.counterclockwise")
-                    if model.isResetting {
-                        Spacer()
-                        ProgressView()
-                    }
+    private var resetButton: some View {
+        Button(role: .destructive) {
+            model.confirmingReset = true
+        } label: {
+            HStack {
+                Label("Reset demo data", systemImage: "arrow.counterclockwise")
+                if model.isResetting {
+                    Spacer()
+                    ProgressView()
                 }
             }
-            .disabled(model.isResetting)
-            .confirmationDialog(
-                "Reset all demo data?", isPresented: $model.confirmingReset, titleVisibility: .visible
-            ) {
-                Button("Reset", role: .destructive) { Task { await model.resetDemoData() } }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Orders, ratings, favorites and preferences will be erased and today's bags restocked.")
-            }
-            .alert("Reset didn't finish", isPresented: $model.resetFailed) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Please try again.")
-            }
-        } footer: {
-            Text("Starts the demo over with fresh bags from every store.")
+        }
+        .disabled(model.isResetting)
+        .confirmationDialog(
+            "Reset all demo data?", isPresented: $model.confirmingReset, titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive) { Task { await model.resetDemoData() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Orders, ratings, favorites and preferences will be erased and today's bags restocked.")
+        }
+        .alert("Reset didn't finish", isPresented: $model.resetFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please try again.")
         }
     }
 }

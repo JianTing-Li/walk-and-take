@@ -137,6 +137,28 @@ struct ProfileModelTests {
         #expect(navigation.discoverPath == [.offer(id: "x")])
     }
 
+    @Test func developerModeStartsOffAndDrivesTheAppClock() async {
+        let (model, harness, _) = await profile()
+        #expect(!model.developer.isOn)
+        model.developer.isOn = true
+        #expect(harness.developer.isOn)
+        let lunch = Fixture.sep(24, 12, 30)
+        model.demo.travel(to: lunch)
+        #expect(harness.clock.now == lunch)
+        #expect(!model.demo.isTimeLive)
+    }
+
+    @Test func turningDeveloperModeOffPutsEverythingBack() async {
+        let (model, harness, _) = await profile()
+        model.setDeveloperMode(true)
+        model.developer.fixedLocation = true
+        model.demo.travel(to: Fixture.sep(24, 12, 30))
+        model.setDeveloperMode(false)
+        #expect(!harness.developer.isOn)
+        #expect(!harness.developer.fixedLocation)
+        #expect(harness.clock.isLive)
+    }
+
     @Test func flagsControlSections() async {
         let (model, _, _) = await profile()
         #expect(model.flags.impact && model.flags.dietaryFilters && !model.flags.commute)

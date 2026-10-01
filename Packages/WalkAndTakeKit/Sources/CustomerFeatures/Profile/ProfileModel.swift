@@ -54,6 +54,10 @@ public final class ProfileModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    /// Developer mode's switches (shown at the bottom of Profile).
+    public var developer: DeveloperSettings { dependencies.developer }
+    var demo: any DemoControlling { dependencies.demo }
+    var offers: any OfferRepository { dependencies.offers }
     public var showsImpact: Bool { flags.impact }
     public var showsDietary: Bool { flags.dietaryFilters }
     public var showsWalkProgress: Bool { flags.walkRewards }
@@ -123,6 +127,16 @@ public final class ProfileModel {
     }
 
     /// Wipes everything back to fresh seed data and pops every tab to its root.
+    /// Turning Developer mode off puts its settings back to their defaults and the clock back to live time.
+    public func setDeveloperMode(_ isOn: Bool) {
+        if isOn {
+            developer.isOn = true
+        } else {
+            developer.turnOff()
+            if !demo.isTimeLive { demo.resetTimeToLive() }
+        }
+    }
+
     public func resetDemoData() async {
         isResetting = true
         defer { isResetting = false }

@@ -60,8 +60,11 @@ public final class DiscoverModel {
         let offers = dependencies.offers.changes()
         let userData = dependencies.favorites.changes()
         let clockChanges = dependencies.clock.changes()
+        let locationChanges = dependencies.developer.locationChanges()
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.resolveLocation() }
+            // Developer mode's Fixed location switch.
+            group.addTask { for await _ in locationChanges { await self.resolveLocation() } }
             group.addTask { for await _ in offers { await self.load() } }
             group.addTask { for await _ in userData { await self.load() } }
             group.addTask { for await _ in clockChanges { await self.load() } }

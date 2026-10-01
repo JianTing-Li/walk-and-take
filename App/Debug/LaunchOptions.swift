@@ -47,11 +47,4 @@
             }
         }
     }
-
-    /// Always "at" the service-area center, as if the device reported it.
-    struct FixedLocationProvider: LocationProvider {
-        func resolve() async -> ResolvedLocation {
-            ResolvedLocation(coordinate: ServiceArea.longIslandCity.center, source: .device)
-        }
-    }
 #endif

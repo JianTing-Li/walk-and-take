@@ -333,6 +333,8 @@ struct Harness {
     let clock: AdjustableClock
     let notifications = FakeNotifications()
     let resetter: FakeResetter
+    let developer: DeveloperSettings
+    let demo: FakeDemoController
     let dependencies: CustomerDependencies
 
     init(
@@ -347,13 +349,37 @@ struct Harness {
         userData = FakeUserData(preferences: preferences, favorites: favorites)
         clock = AdjustableClock(fixedAt: now)
         resetter = FakeResetter(marketplace: marketplace, userData: userData, walkRewards: walkRewards)
+        developer = DeveloperSettings(defaults: freshDefaults())
+        demo = FakeDemoController(clock: clock)
         dependencies = CustomerDependencies(
             offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
             preferences: userData, walkRewards: walkRewards, walkTracker: walkTracker,
             location: FakeLocation(result: location),
             notifications: notifications,
-            resetter: resetter, clock: clock, flags: flags)
+            resetter: resetter, clock: clock, flags: flags, developer: developer, demo: demo)
     }
+}
+
+/// A UserDefaults suite of its own, so tests never share Developer mode switches.
+func freshDefaults() -> UserDefaults {
+    let name = "WalkAndTakeTests.\(UUID().uuidString)"
+    return UserDefaults(suiteName: name)!
+}
+
+/// Demo actions on the test clock.
+@MainActor
+final class FakeDemoController: DemoControlling {
+    let clock: AdjustableClock
+
+    init(clock: AdjustableClock) {
+        self.clock = clock
+    }
+
+    var now: Date { clock.now }
+    var isTimeLive: Bool { clock.isLive }
+    func travel(to date: Date) { clock.travel(to: date) }
+    func advanceTime(by interval: TimeInterval) { clock.advance(by: interval) }
+    func resetTimeToLive() { clock.resetToLive() }
 }
 
 /// Polls until `condition` holds (for stream-driven updates), up to ~2 s.
