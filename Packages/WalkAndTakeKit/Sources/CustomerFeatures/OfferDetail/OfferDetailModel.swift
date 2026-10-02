@@ -25,10 +25,10 @@ public final class OfferDetailModel {
     private(set) var restaurant: Restaurant?
     /// Lifetime walked miles, for the "after this pickup" line.
     private(set) var walkMiles = 0.0
-    private var now: Date
+    private(set) var now: Date
     private let offerID: String
     private let origin: ResolvedLocation
-    private let dependencies: CustomerDependencies
+    let dependencies: CustomerDependencies
     private let navigation: CustomerNavigation
 
     /// - Parameter origin: Where distances are measured from (the list's resolved location).
@@ -45,6 +45,7 @@ public final class OfferDetailModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     /// Heart in the toolbar (favorites flag).
     public var showsFavoriteButton: Bool { flags.favorites }
     private var calendar: Calendar { NYCalendar.calendar }
@@ -142,6 +143,18 @@ public final class OfferDetailModel {
     public var price: Money { offer?.price ?? .zero }
     public var estimatedValue: Money { offer?.estimatedValue ?? .zero }
     public var savingsPercent: Int { offer?.savingsPercent ?? 0 }
+
+    /// The Price row follows the reward switch: one bag's price after 50% off, and the bigger saving.
+    var usesRewardOnPrice: Bool { reserve.useReward && reserve.showsRewardToggle }
+    public var displayPrice: Money { usesRewardOnPrice ? price - reserve.rewardDiscount : price }
+
+    /// "You save 64%", or "With your reward · you save 82%".
+    public var priceNote: String {
+        guard usesRewardOnPrice, estimatedValue.cents > 0 else { return "You save \(savingsPercent)%" }
+        let percent = Int(
+            (Double(estimatedValue.cents - displayPrice.cents) / Double(estimatedValue.cents) * 100).rounded())
+        return "With your reward · you save \(percent)%"
+    }
     public var coordinate: Coordinate? { restaurant?.coordinate }
 
     public var badgeText: String {
@@ -161,6 +174,11 @@ public final class OfferDetailModel {
     }
 
     /// "Opens tomorrow at 7:30 AM", "Ends in 25 min", "Sold out".
+    /// The hero badge, unless it says the same as the time row ("Opens at 12:00 PM" twice).
+    public var heroBadgeText: String? {
+        badgeText.isEmpty || badgeText == urgencyText ? nil : badgeText
+    }
+
     public var urgencyText: String {
         offer.map { OfferAvailability.urgencyText(for: $0, at: now, calendar: calendar) } ?? ""
     }
@@ -188,18 +206,6 @@ public final class OfferDetailModel {
             footnote: WalkCopy.capNote(forDistance: distance),
             outcome: WalkCopy.outcomeText(currentMiles: walkMiles, distance: distance),
             unlock: WalkCopy.unlockText(currentMiles: walkMiles, distance: distance))
-    }
-
-    /// Review line above the Reserve button: "0.7 mi walk · +0.7 mi toward a reward".
-    public var walkReviewLine: String? {
-        guard flags.walkRewards, canReserve, let distance = walkDistance else { return nil }
-        return
-            "\(WalkCopy.walkTitle(forDistance: distance)) · +\(WalkCopy.miles(WalkCopy.earnedMiles(forDistance: distance))) mi toward a reward"
-    }
-
-    /// Above the Reserve button: miles only count for a walked pickup. Shown while the bag can be reserved.
-    public var walkReminderLine: String? {
-        flags.walkRewards && canReserve ? WalkCopy.reserveReminder : nil
     }
 
     /// "50% off one bag: −$3.00" while the reward is switched on.

@@ -38,6 +38,10 @@ public final class ProfileModel {
         didSet { if isLoaded, commute != oldValue { save { [commute] in try await $0.updateCommuteProfile(commute) } } }
     }
 
+    /// The "Reward unlocked" banner after a demo action banks rewards. Clears itself after a few seconds.
+    public private(set) var rewardUnlock: RewardUnlock?
+    public var confirmingClearRewards = false
+
     public var confirmingReset = false
     public private(set) var isResetting = false
     public var resetFailed = false
@@ -54,6 +58,10 @@ public final class ProfileModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    /// Developer mode's switches (shown at the bottom of Profile).
+    public var developer: DeveloperSettings { dependencies.developer }
+    var demo: any DemoControlling { dependencies.demo }
+    var offers: any OfferRepository { dependencies.offers }
     public var showsImpact: Bool { flags.impact }
     public var showsDietary: Bool { flags.dietaryFilters }
     public var showsWalkProgress: Bool { flags.walkRewards }
@@ -123,6 +131,50 @@ public final class ProfileModel {
     }
 
     /// Wipes everything back to fresh seed data and pops every tab to its root.
+    /// Turning Developer mode off puts its settings back to their defaults and the clock back to live time.
+    public func setDeveloperMode(_ isOn: Bool) {
+        if isOn {
+            developer.isOn = true
+        } else {
+            developer.turnOff()
+            if !demo.isTimeLive { demo.resetTimeToLive() }
+        }
+    }
+
+    // MARK: - Developer mode: rewards
+
+    /// Adds demo miles; crossing a milestone shows the unlock banner.
+    public func demoAddMiles(_ miles: Double) async {
+        celebrate(await demo.addMiles(miles), granted: false)
+        await loadWalkRewards()
+    }
+
+    public func demoCompleteMilestone() async {
+        celebrate(await demo.completeNextMilestone(), granted: false)
+        await loadWalkRewards()
+    }
+
+    public func demoGrantReward() async {
+        celebrate(await demo.grantReward().map { [$0] } ?? [], granted: true)
+        await loadWalkRewards()
+    }
+
+    public func demoClearWalksAndRewards() async {
+        await demo.clearWalksAndRewards()
+        rewardUnlock = nil
+        await loadWalkRewards()
+    }
+
+    private func celebrate(_ rewards: [Reward], granted: Bool) {
+        guard !rewards.isEmpty else { return }
+        let unlock = RewardUnlock(count: rewards.count, granted: granted)
+        rewardUnlock = unlock
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            if rewardUnlock?.id == unlock.id { rewardUnlock = nil }
+        }
+    }
+
     public func resetDemoData() async {
         isResetting = true
         defer { isResetting = false }
@@ -145,13 +197,17 @@ public final class ProfileModel {
     public var walkProgress: WalkProgressCard.Content? {
         guard flags.walkRewards else { return nil }
         let next = WalkRewardLadder.nextMilestone(after: walkMiles)
+        let reached = WalkRewardLadder.milestonesReached(totalMiles: walkMiles)
+        let previous = reached == 0 ? 0 : WalkRewardLadder.milestone(at: reached - 1)
         let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
         let ready = availableRewards
         return WalkProgressCard.Content(
             milesText: "\(WalkCopy.miles(walkMiles)) mi",
             milesCaption: "walked to pickups",
             progress: WalkRewardLadder.progressFraction(totalMiles: walkMiles),
-            targetTitle: WalkRewardLadder.milestonesReached(totalMiles: walkMiles) == 0
+            // A tick per mile between milestones; quarter miles on the way to the first one.
+            ticks: MilestoneProgressBar.ticks(from: previous, to: next, every: next - previous <= 1 ? 0.25 : 1),
+            targetTitle: reached == 0
                 ? "First reward: \(discount) at \(WalkCopy.milestone(next)) mi"
                 : "Next: \(discount) at \(WalkCopy.milestone(next)) mi",
             targetDetail: "\(WalkCopy.miles(WalkRewardLadder.milesToNext(totalMiles: walkMiles))) mi to go",
@@ -174,5 +230,20 @@ public final class ProfileModel {
     public func minutes(from date: Date) -> Int {
         let parts = NYCalendar.calendar.dateComponents([.hour, .minute], from: date)
         return (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+    }
+}
+
+/// What the "Reward unlocked" banner says.
+public struct RewardUnlock: Identifiable, Hashable, Sendable {
+    public let id = UUID()
+    public let title: String
+    public let detail: String
+    public let footer: String
+
+    init(count: Int, granted: Bool) {
+        let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
+        title = granted ? "Reward added" : count == 1 ? "Reward unlocked" : "\(count) rewards unlocked"
+        detail = count == 1 ? "\(discount) is ready to use." : "\(discount), \(count) times over."
+        footer = "Turn it on when you reserve a bag."
     }
 }

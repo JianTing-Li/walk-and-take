@@ -93,6 +93,26 @@ extension UserDataStore {
         try save(.walkRewardsChanged)
     }
 
+    // MARK: - Developer mode
+
+    /// Banks a reward without changing miles (Developer mode's "Grant a reward").
+    public func bankReward(milestoneMiles: Double, at now: Date) throws -> Reward {
+        let reward = Reward(milestoneMiles: milestoneMiles, earnedAt: now)
+        modelContext.insert(RewardEntity(reward))
+        try save(.walkRewardsChanged)
+        return reward
+    }
+
+    /// Clears finished walks and every reward, back to zero miles. Walks still in progress stay,
+    /// so open orders keep recording.
+    public func clearWalksAndRewards() throws {
+        for walk in try modelContext.fetch(FetchDescriptor<WalkEntity>()) where walk.finishedAt != nil {
+            modelContext.delete(walk)
+        }
+        try modelContext.delete(model: RewardEntity.self)
+        try save(.walkRewardsChanged)
+    }
+
     // MARK: - Helpers
 
     private func walkEntity(_ reservationID: UUID) throws -> WalkEntity? {

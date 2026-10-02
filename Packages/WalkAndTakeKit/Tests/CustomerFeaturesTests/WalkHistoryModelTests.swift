@@ -42,7 +42,15 @@ struct WalkHistoryModelTests {
         await model.load()
         #expect(model.state == .loaded)
         #expect(model.isEmpty)
-        #expect(model.summaryText == "0 walked pickups · 0.00 mi counted")
+        #expect(model.summaryText == "0 walked pickups · 0.0 mi counted")
+    }
+
+    @Test func developerModeMilesShowAsADemoWalk() async {
+        let harness = Harness(now: Fixture.sep(24, 12), offers: [Self.offer])
+        _ = await harness.demo.addMiles(1)
+        let model = await model(harness)
+        #expect(model.rows.map(\.title) == ["Demo walk"])
+        #expect(model.rows[0].milesText == "+1.0 mi")
     }
 
     @Test func listsWalksNewestFirstWithRestaurantDateAndMiles() async throws {
@@ -53,9 +61,9 @@ struct WalkHistoryModelTests {
 
         #expect(model.rows.map(\.title) == ["Mid Deli", "Near Café"])
         #expect(model.rows[0].dateText == "Thu Sep 24 · 9:00 AM")
-        #expect(model.rows[0].milesText == "+0.60 mi")
-        #expect(model.rows[1].milesText == "+0.23 mi")
-        #expect(model.summaryText == "2 walked pickups · 0.83 mi counted")
+        #expect(model.rows[0].milesText == "+0.6 mi")
+        #expect(model.rows[1].milesText == "+0.2 mi")
+        #expect(model.summaryText == "2 walked pickups · 0.8 mi counted")
     }
 
     @Test func eachRowShowsTheRunningTotalAfterThatWalk() async throws {
@@ -63,8 +71,8 @@ struct WalkHistoryModelTests {
         try await walk(harness, restaurant: "near", miles: 0.4, finished: Fixture.sep(22, 8))
         try await walk(harness, restaurant: "mid", miles: 0.6, finished: Fixture.sep(24, 9))
         let model = await model(harness)
-        #expect(model.rows[0].detail == "1.00 mi walked in total")  // newest
-        #expect(model.rows[1].detail == "0.40 mi walked in total")  // oldest
+        #expect(model.rows[0].detail == "1.0 mi walked in total")  // newest
+        #expect(model.rows[1].detail == "0.4 mi walked in total")  // oldest
     }
 
     @Test func aWalkThatEarnedNothingSaysWhy() async throws {
@@ -75,7 +83,7 @@ struct WalkHistoryModelTests {
         #expect(row.milesText == "0 mi")
         #expect(!row.earnedMiles)
         #expect(row.detail == WalkRejection.tooFast.message)
-        #expect(model.summaryText == "1 walked pickup · 0.00 mi counted")
+        #expect(model.summaryText == "1 walked pickup · 0.0 mi counted")
     }
 
     @Test func aWalkNotYetFinishedIsLeftOut() async throws {

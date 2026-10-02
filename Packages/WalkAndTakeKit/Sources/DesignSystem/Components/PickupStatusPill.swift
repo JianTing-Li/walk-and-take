@@ -14,7 +14,7 @@ public struct PickupStatusPill: View {
             switch self {
             case .readyNow: .splashTeal
             case .upcoming: .orange
-            case .collected: .green
+            case .collected: .splashTeal
             case .inactive: .secondary
             }
         }
@@ -38,11 +38,14 @@ public struct PickupStatusPill: View {
 
     public var body: some View {
         HStack(spacing: 6) {
-            Text(text).foregroundStyle(tone.color)
             if let rating {
+                Text(text).foregroundStyle(tone.color)
                 StarsDisplay(rating: rating, size: 10)
-            } else if showsRatePrompt {
-                Text("· Rate your bag").foregroundStyle(.orange)
+            } else {
+                // One run of text, so a long status and the prompt wrap together.
+                Text(
+                    "\(Text(text).foregroundStyle(tone.color))\(Text(showsRatePrompt ? " · Rate your bag" : "").foregroundStyle(.orange))"
+                )
             }
         }
         .font(.caption.weight(.semibold))

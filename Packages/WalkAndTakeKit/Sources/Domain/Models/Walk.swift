@@ -83,6 +83,14 @@ public struct Walk: Identifiable, Hashable, Codable, Sendable {
 }
 
 /// A banked 50%-off voucher for one bag, earned at a mileage milestone.
+extension Walk {
+    /// Developer mode's demo miles are walks to a made-up store whose ID starts with this.
+    public static let demoRestaurantPrefix = "demo"
+
+    /// Miles added by Developer mode rather than a pickup.
+    public var isDemo: Bool { restaurantID.hasPrefix(Self.demoRestaurantPrefix) }
+}
+
 public struct Reward: Identifiable, Hashable, Codable, Sendable {
     public let id: UUID
     public let milestoneMiles: Double

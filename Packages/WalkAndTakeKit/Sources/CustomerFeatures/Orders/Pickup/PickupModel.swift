@@ -40,14 +40,23 @@ public final class PickupModel {
     /// What a finished, credited walk added to the customer's miles. Worked out from their walk history,
     /// so it's the same right after pickup and whenever the order is opened later.
     public private(set) var earnings: WalkEarnings?
+    /// A walk is being started; Start walk can't be tapped again meanwhile.
+    public private(set) var isStartingWalk = false
+    /// Developer mode: this walk is simulated, and whether it's walking on its own.
+    public private(set) var walkIsSimulated = false
+    public private(set) var isAutoWalking = false
+    /// Progress checks in a row with no usable fix. After a few, the card suggests keeping the app open.
+    private var emptyPolls = 0
+    /// About 30 s of polling (every 3 s).
+    static let noFixHintAfterPolls = 10
     /// Stars tapped on the rating card; presents the rating sheet.
     public var rateRequest: RateRequest?
 
     private(set) var reservation: Reservation?
-    private var now: Date
-    private let reservationID: UUID
+    private(set) var now: Date
+    let reservationID: UUID
     private let origin: ResolvedLocation
-    private let dependencies: CustomerDependencies
+    let dependencies: CustomerDependencies
 
     public init(reservationID: UUID, origin: ResolvedLocation, dependencies: CustomerDependencies) {
         self.reservationID = reservationID
@@ -57,6 +66,7 @@ public final class PickupModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     private var calendar: Calendar { NYCalendar.calendar }
 
     // MARK: - Lifecycle
@@ -77,7 +87,8 @@ public final class PickupModel {
             group.addTask {
                 // The walk moves faster than the order does, so its progress refreshes more often.
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(3))
+                    // Simulated walks refresh every second so Developer mode's demo moves smoothly.
+                    try? await Task.sleep(for: .seconds(self.walkIsSimulated ? 1 : 3))
                     await self.refreshLiveProgress()
                 }
             }
@@ -137,11 +148,18 @@ public final class PickupModel {
         guard flags.walkRewards, let walk, walk.finishedAt == nil, let snapshot = reservation?.snapshot,
             trackingStatus != .idle
         else {
-            liveProgress = nil
+            if liveProgress != nil { liveProgress = nil }
             return
         }
         let samples = await dependencies.walkTracker.samples(reservationID: reservationID)
-        liveProgress = WalkVerifier.progress(samples: samples, destination: snapshot.coordinate)
+        let progress = WalkVerifier.progress(samples: samples, destination: snapshot.coordinate)
+        // Only a real change redraws the screen.
+        if progress != liveProgress { liveProgress = progress }
+        if developer.isOn {
+            walkIsSimulated = await dependencies.demo.isSimulatedWalk(reservationID)
+            isAutoWalking = await dependencies.demo.isAutoWalking(reservationID)
+        }
+        emptyPolls = liveProgress == nil ? emptyPolls + 1 : 0
         trackingStatus = await dependencies.walkTracker.status(reservationID: reservationID)
     }
 
@@ -161,7 +179,14 @@ public final class PickupModel {
 
     /// Starts recording the walk to the restaurant.
     public func startWalk() async {
-        guard canStartWalk, let snapshot = reservation?.snapshot else { return }
+        guard canStartWalk else { return }
+        await beginWalk()
+    }
+
+    func beginWalk() async {
+        guard !isStartingWalk, walk == nil, let snapshot = reservation?.snapshot else { return }
+        isStartingWalk = true
+        defer { isStartingWalk = false }
         do {
             walk = try await dependencies.walkRewards.startWalk(
                 reservationID: reservationID, restaurantID: snapshot.restaurantID, at: dependencies.clock.now)
@@ -236,7 +261,8 @@ public final class PickupModel {
             Header(
                 symbol: "xmark.circle.fill", tone: .inactive, title: "Order cancelled",
                 subtitle: "Cancelled at \(time(reservation.cancelledAt ?? now)). You won't be charged, "
-                    + "and your bag is back on sale for someone else.")
+                    + "and your bag is back on sale for someone else."
+                    + (reservation.rewardID != nil ? " Your walking reward is back in your rewards." : ""))
         }
     }
 
@@ -251,18 +277,6 @@ public final class PickupModel {
         guard flags.manageOrder, isActive, !canManage, let reservation else { return nil }
         let deadline = time(ReservationPolicy.changeDeadline(for: reservation))
         return "Changes closed at \(deadline). The store is getting your bag ready."
-    }
-
-    /// Bottom bar for an upcoming order: "You can confirm pickup from tomorrow at 7:30 AM".
-    public var confirmFromText: String? {
-        guard status == .upcoming, let reservation else { return nil }
-        let window = reservation.snapshot.pickupWindow
-        let when = time(window.start)
-        return switch PickupDayFormatter.day(of: window, now: now, calendar: calendar) {
-        case .today, .tonight: "You can confirm pickup from \(when)"
-        case .tomorrow: "You can confirm pickup from tomorrow at \(when)"
-        case .other(let date): "You can confirm pickup from \(TimeText.shortDate(date, calendar: calendar)) at \(when)"
-        }
     }
 
     /// "Vernon Blvd & 48th Ave, Long Island City · 0.2 mi"
@@ -295,15 +309,25 @@ public final class PickupModel {
         case walking(Walking)
 
         public struct Walking: Hashable, Sendable {
+            public enum Phase: Hashable, Sendable {
+                /// On the way (or waiting for a location).
+                case walking
+                /// At the door before the pickup window opens.
+                case arrivedEarly
+                /// At the door with the window open: the card shrinks so the code and swipe show.
+                case arrived
+            }
+
+            public var phase: Phase
             public var title: String
-            public var detail: String
+            public var detail: String?
             public var warning: String?
-            /// 0...1 along the route. Nil until there are two usable fixes.
-            public var fraction: Double?
+            /// 0...1 along the route; 0 until there are two usable fixes.
+            public var fraction: Double
+            /// Tick marks on the bar, 0...1.
+            public var ticks: [Double]
             /// "0.3 mi walked · 0.2 mi to go", or what we're waiting for.
             public var progressText: String
-            /// "Counting +0.30 mi so far", once some of the walk counts.
-            public var countingText: String?
         }
     }
 
@@ -320,15 +344,7 @@ public final class PickupModel {
     public var walkSection: WalkSection? {
         guard flags.walkRewards, isActive, let reservation, let distance = walkDistance else { return nil }
         if let walk, walk.finishedAt == nil {
-            return .walking(
-                .init(
-                    title: "Walk in progress",
-                    detail: "Started at \(time(walk.startedAt)). Swipe to confirm pickup when you arrive.",
-                    warning: trackingStatus == .locationOff
-                        ? "Location is off, so your miles can't be counted. Turn it on in Settings." : nil,
-                    fraction: liveProgress?.fraction,
-                    progressText: liveProgress.map(WalkCopy.progressText) ?? "Waiting for your first location…",
-                    countingText: liveProgress.flatMap(WalkCopy.countingText)))
+            return .walking(walking(walk, reservation: reservation, distance: distance))
         }
         if canStartWalk {
             return .ready(
@@ -341,6 +357,38 @@ public final class PickupModel {
         return .opensLater("Start walk opens at \(time(WalkPolicy.startOpensAt(for: reservation)))")
     }
 
+    /// The walk card while recording: on the way, here early, or here with the window open.
+    private func walking(_ walk: Walk, reservation: Reservation, distance: Double) -> WalkSection.Walking {
+        let ticks = WalkCopy.walkTicks(forDistance: distance)
+        let opens = time(reservation.snapshot.pickupWindow.start)
+        // With location off the recording can't be trusted, so it stays "walking" with the warning.
+        if let progress = liveProgress, trackingStatus != .locationOff, WalkCopy.isAtDoor(progress) {
+            if status == .upcoming {
+                return .init(
+                    phase: .arrivedEarly, title: "You've arrived",
+                    detail: "You're here early. Pickup opens at \(opens) — your miles are saved.",
+                    fraction: 1, ticks: ticks, progressText: WalkCopy.walkedText(progress))
+            }
+            return .init(
+                phase: .arrived, title: "\(WalkCopy.walkedText(progress)) · swipe below to confirm",
+                fraction: 1, ticks: ticks, progressText: WalkCopy.walkedText(progress))
+        }
+        let started = "Started at \(time(walk.startedAt))."
+        let waitingTooLong = liveProgress == nil && emptyPolls >= Self.noFixHintAfterPolls
+        let warning: String? =
+            switch trackingStatus {
+            case .locationOff: "Location is off, so your miles can't be counted. Turn it on in Settings."
+            default: waitingTooLong ? "No location yet. Keep Walk & Take open while you walk." : nil
+            }
+        return .init(
+            phase: .walking, title: "Walk in progress",
+            detail: status == .upcoming
+                ? "\(started) Pickup opens at \(opens)." : "\(started) Swipe to confirm pickup when you arrive.",
+            warning: warning,
+            fraction: liveProgress?.fraction ?? 0, ticks: ticks,
+            progressText: liveProgress.map(WalkCopy.progressText) ?? "Waiting for your first location…")
+    }
+
     /// The "miles earned" celebration after a credited walk. Nil for other pickups or with the flag off.
     public var walkEarned: WalkEarnedCard.Content? {
         guard flags.walkRewards, status == .collected, let earnings else { return nil }
@@ -350,7 +398,7 @@ public final class PickupModel {
     /// After pickup: miles counted, or why none were.
     public var walkResultText: String? {
         guard flags.walkRewards, let walk, walk.finishedAt != nil else { return nil }
-        if walk.creditedMiles > 0 { return "+\(WalkCopy.miles(walk.creditedMiles, places: 2)) mi counted toward rewards" }
+        if walk.creditedMiles > 0 { return "+\(WalkCopy.miles(walk.creditedMiles)) mi counted toward rewards" }
         return walk.rejection?.message
     }
 
@@ -370,15 +418,20 @@ public final class PickupModel {
 
     public var summary: [(label: String, value: String)] {
         guard let reservation else { return [] }
-        var rows = [
-            ("Order", "\(reservation.quantity) × \(reservation.snapshot.bagName)"),
-            ("Pickup", PickupDayFormatter.full(reservation.snapshot.pickupWindow, now: now, calendar: calendar)),
-        ]
+        // After pickup, say when it happened rather than when to go.
+        let when: (String, String) =
+            if let collectedAt = reservation.collectedAt {
+                ("Picked up", "\(TimeText.shortDate(collectedAt, calendar: calendar)) at \(time(collectedAt))")
+            } else {
+                ("Pickup", PickupDayFormatter.full(reservation.snapshot.pickupWindow, now: now, calendar: calendar))
+            }
+        var rows = [("Order", "\(reservation.quantity) × \(reservation.snapshot.bagName)"), when]
         if reservation.rewardID != nil {
             rows.append(("Reward", "\(WalkRewardLadder.discountPercent)% off one bag: −\(reservation.discount.usd)"))
         }
         rows.append(("Total", reservation.total.usd))
-        if let walkResultText { rows.append(("Walk", walkResultText)) }
+        // The earned card already shows a credited walk; the row only explains walks that earned nothing.
+        if walkEarned == nil, let walkResultText { rows.append(("Walk", walkResultText)) }
         return rows
     }
 

@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 
 public struct OrdersView<Destination: View>: View {
@@ -25,6 +26,19 @@ public struct OrdersView<Destination: View>: View {
     public var body: some View {
         NavigationStack(path: $navigation.ordersPath) {
             content
+                .overlay(alignment: .bottomTrailing) {
+                    if model.developer.usesDemoControls {
+                        DemoMenuButton(
+                            title: "Demo · reminders arrive in 1 s",
+                            actions: model.demoReminders.map { item in
+                                DemoAction(item.title, systemImage: "bell.badge") {
+                                    Task { await model.demoSend(item.reminder) }
+                                }
+                            }
+                        )
+                        .padding(Spacing.l)
+                    }
+                }
                 .navigationTitle("Orders")
                 .navigationDestination(for: OrdersRoute.self, destination: destination)
         }
@@ -43,7 +57,7 @@ public struct OrdersView<Destination: View>: View {
             ) { Task { await model.retry() } }
         case .loaded, .empty:
             List {
-                if model.showsImpact {
+                if model.showsImpact, model.state != .empty {
                     Section {
                         ImpactCard(impact: model.impact)
                     }

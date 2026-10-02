@@ -65,7 +65,7 @@ public struct EmptyStateView: View {
         "No favorites yet",
         systemImage: "heart",
         message: "Tap the heart on any store to save it here.",
-        actionTitle: "Browse stores"
+        actionTitle: "Find food nearby"
     ) {}
     .dynamicTypeSize(.accessibility2)
 }

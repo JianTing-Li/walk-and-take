@@ -42,14 +42,10 @@ public enum PickupDayFormatter {
         }
     }
 
-    /// Card copy: "Today · 7:30–10:00 AM", "Tomorrow · 7:30–10:00 AM", or, once the
-    /// window is open, "Tonight · until 11:59 PM".
+    /// Card copy, always the full window: "Today · 7:30–10:00 AM", "Tomorrow · 7:30–10:00 AM".
+    /// The badge on the card says whether it's open or ending soon.
     public static func short(_ window: PickupWindow, now: Date, calendar: Calendar) -> String {
-        let label = dayLabel(for: window, now: now, calendar: calendar)
-        if window.isOpen(at: now) {
-            return "\(label) · until \(TimeText.time(window.end, calendar: calendar))"
-        }
-        return "\(label) · \(TimeText.range(window, calendar: calendar))"
+        "\(dayLabel(for: window, now: now, calendar: calendar)) · \(TimeText.range(window, calendar: calendar))"
     }
 
     /// Full-date copy for detail and order screens:

@@ -41,7 +41,7 @@ Domain      ──►  Foundation only
 
 | Module | Holds | Default isolation |
 |---|---|---|
-| **App** | Composition root (`AppDependencies`), `AppRoot`, splash, rollover triggers, DEBUG tools | MainActor |
+| **App** | Composition root (`AppDependencies`), `AppRoot`, splash, rollover triggers, `DemoController` (Developer mode), DEBUG launch arguments | MainActor |
 | **Domain** | Plain `Sendable` models, pure business rules (including walk verification and the reward ladder), repository **protocols** | nonisolated |
 | **Platform** | `Clock`, `NYCalendar`, location, walk tracking, notifications, pickup codes, QR codes | nonisolated |
 | **MockData** | SwiftData entities, seed JSON + loader, `MarketplaceStore`, `UserDataStore`, repository implementations | nonisolated |
@@ -149,7 +149,7 @@ The store always holds offers for **today and tomorrow** (New York). `rolloverIf
 4. Prunes offers from earlier days whose window has ended. Reservations are never touched.
 5. Saves `lastGeneratedDayKey` and emits `.rolledOver`; the app then reschedules favorite alerts.
 
-Triggers: app launch, scene becoming active, `significantTimeChangeNotification`, and DEBUG time travel.
+Triggers: app launch, scene becoming active, `significantTimeChangeNotification`, and Developer mode's time travel.
 Running it repeatedly is a no-op.
 
 ### Reset
@@ -161,19 +161,22 @@ notifications and pops every tab to its root.
 
 ## 5. Platform services
 
-- **Clock**: `protocol Clock: Sendable { var now: Date { get } }` plus a change stream. `LiveClock` in
-  production; `AdjustableClock` (DEBUG) applies an offset for time travel.
+- **Clock**: `protocol Clock: Sendable { var now: Date { get } }` plus a change stream. The app runs on an
+  `AdjustableClock` in every build: live time, unless Developer mode's time travel (or a UI test) moves it.
 - **LocationProvider**: returns `ResolvedLocation(latitude, longitude, source: .device | .fallback(reason))`
   using `CLLocationUpdate.liveUpdates` / `CLServiceSession`. Falls back to the LIC center
   (`40.7455, -73.9490`) when permission is denied/restricted, there's no fix within 5 s, the simulator has
   no location, or the device is more than 1.5 mi from the service area. Distances to restaurants are
   computed from the resolved location.
 - **NotificationScheduler**: local "bags are open" alerts for favorited restaurants, identifiers
-  `drop-<offerID>`, plus a preview alert.
+  `drop-<offerID>`. Developer mode can also send one of those alerts at once (`sendPreview(_:after:)`) or an
+  order's "your bag is ready" reminder (`sendReminder(_:after:)`). Scheduling errors are logged, not hidden.
 - **WalkTracking**: records GPS fixes per reservation (`LiveWalkTracker`, fed by `CoreLocationWalkSource`
   using `CLLocationUpdate.liveUpdates(.fitness)` and a `CLBackgroundActivitySession`). Needs the `location`
   background mode so a walk keeps recording with the screen locked. Verification itself is the Domain rule
-  `WalkVerifier`.
+  `WalkVerifier`. `SwitchingWalkTracker` sends each walk to GPS or to Developer mode's `DemoWalkTracker`,
+  decided when the walk begins.
+- **DeveloperSettings**: Developer mode's switches, saved in `UserDefaults` (see section 10).
 - **PickupCodeGenerator**: 4 chars from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 - **QRCodeGenerator**: CoreImage QR of the pickup code.
 
@@ -188,7 +191,7 @@ A compile-time `FeatureFlags` value is created in `AppDependencies` and injected
 |---|---|---|
 | `mapBrowse` | on | Discover map mode toggle |
 | `favorites` | on | Favorites tab, heart buttons |
-| `notifications` | on | Alert toggles, preview alert (requires `favorites`) |
+| `notifications` | on | Alert toggles and the Demo menu's alerts (requires `favorites`) |
 | `dietaryFilters` | on | Dietary section in Profile, dietary filtering |
 | `manageOrder` | on | Change quantity / cancel |
 | `reviews` | on | Rate order, ratings display |
@@ -205,24 +208,23 @@ Everything runs from the shared **Walk_And_Take** scheme (⌘U in Xcode): the fi
 
 ```sh
 xcodebuild test -project Walk_And_Take.xcodeproj -scheme Walk_And_Take \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 ```
 
 Package tests alone (faster): `cd Packages/WalkAndTakeKit && xcodebuild test -scheme WalkAndTakeKit-Package
 -destination '…'`. Rule tests use a fixed New York calendar with Thu Sep 24, 2026 as "today".
 
-**DEBUG tools** (Profile → Developer):
+Demo tools live in **Developer mode** (section 10), in every build.
 
-- **Time travel** jumps the app clock (`AdjustableClock`) to 7:45 AM, 12:30 PM, 8:15 PM, 11:50 PM, or the next
-  day, and back to live. Moving the clock triggers rollover, so crossing 8 PM or midnight behaves as in real time.
-- **Seed map** shows every seed restaurant with the 1.5 mi service area; any outside it are listed in red.
+**DEBUG launch arguments** (used by the UI tests): `-UITestInMemoryStore` (fresh data, Developer mode off),
+`-UITestNow <ISO 8601>` (freezes the clock), `-UITestFixedLocation` (LIC center, no permission prompt),
+`-UITestSkipSplash`. Walking demos: `-UITestSeedReward` (one 1.2 mi walk, one banked reward),
+`-UITestSeedMiles <n>` (one walk of n miles), `-UITestSeedHistory` (three walks at real restaurants),
+`-UITestSimulateWalk` (every walk is simulated). The seed arguments combine.
 
-**DEBUG launch arguments** (used by the UI tests): `-UITestInMemoryStore`, `-UITestNow <ISO 8601>` (freezes
-the clock), `-UITestFixedLocation` (LIC center, no permission prompt), `-UITestSkipSplash`.
-
-Walking demos (DEBUG): `-UITestSeedReward` (one 1.2 mi walk, one banked reward), `-UITestSeedMiles <n>` (one walk
-of n miles), `-UITestSeedHistory` (three walks at real restaurants), `-UITestSimulateWalk` (a scripted 0.5 mi
-walk of about 24 s instead of GPS). The seed arguments combine.
+**Simulator notes.** Reinstall with `simctl uninstall` then `install`: installing over the app many times can
+leave iOS dropping its notifications ("local client does not exist" in the log). Screenshots taken through
+`simctl` can lag one action behind taps; trust the UI tests for sequences.
 
 ---
 
@@ -268,9 +270,37 @@ pickup is confirmed first, then the recorded track is verified and miles are cre
 
 - Verification uses GPS signals only. There is no pedometer or motion-activity check, and no Apple Health.
 - Recorded fixes live in memory. If the app is killed mid-walk, recording resumes but earlier fixes are lost.
-- The live "counting so far" figure drops fast segments but doesn't judge the whole walk; the final check at
-  pickup can still reject it.
+- Live progress drops fast segments but doesn't judge the whole walk; the final check at pickup can still
+  reject it.
 - Everything is on device with no server, so a changed device clock or a determined spoofer isn't stopped.
-- The real `CoreLocation` tracker has been exercised only through the simulator's scripted stand-in
-  (`-UITestSimulateWalk`), not on a device.
+- The real `CoreLocation` tracker has been exercised only in the simulator, through Developer mode's
+  simulated walks, not on a device.
+
+---
+
+## 10. Developer mode
+
+A switch at the bottom of Profile, **in every build**, so the whole flow can be demoed without walking
+anywhere. It's off by default and turning it off resets every setting under it and returns the clock to
+live time. Free self-granted rewards are accepted: this is a demo app with no backend.
+
+**Settings** (`Platform/Developer/DeveloperSettings`, saved in `UserDefaults`, kept by Reset demo data):
+Show demo controls, Fixed location, Simulated walks, Auto-walk duration. The Developer section also holds
+Time travel, Seed map, Clear walks & rewards and Reset demo data.
+
+**Demo button.** The only demo UI on a screen is a floating `DemoMenuButton` (DesignSystem) that opens a
+compact menu, so screens otherwise look exactly as customers see them. Each screen's actions live in a
+`+Demo` extension of its model (`PickupModel+Demo`, `ProfileModel` demo actions, `DiscoverModel+Demo`,
+`OfferDetailModel+Demo`, `FavoritesModel+Demo`, `OrdersModel+Demo`).
+
+**Boundary.** Features talk to one protocol, `DemoControlling` (CustomerFeatures/Developer), for time travel,
+driving a simulated walk and adding miles or rewards. Only `App/Demo/DemoController` implements it, with the
+concrete `AdjustableClock`, `DemoWalkTracker` and `UserDataStore`, so customer-facing repositories have no demo
+methods and features still never import MockData.
+
+**Simulated walks.** `DemoWalkTracker` (Platform) walks a straight route from the resolved location to the
+door, with fixes paced at 3 mph so `WalkVerifier` credits it like a real walk (confirming before arriving is
+rejected, just as with GPS). It walks itself over the Auto-walk duration, or is stepped (+0.1 mi), paused,
+or sent to the door. Demo miles from Profile are finished walks to a made-up `demo-…` store, so they follow the
+milestone rules, skip the one-pickup-per-store-per-day limit, and show in Walk history as "Demo walk".
 

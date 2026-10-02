@@ -29,6 +29,31 @@ struct OrdersModelTests {
         return (model, harness)
     }
 
+    @Test func theDemoMenuSendsAPickupReminderPerActiveOrder() async throws {
+        let (model, harness) = await orders(at: Fixture.sep(24, 8)) {
+            $0.add(Fixture.reservation(for: Self.breakfast))
+            $0.add(Fixture.reservation(for: Self.dinner))
+        }
+        #expect(model.demoReminders.map(\.title).count == 2)
+        let first = try #require(model.demoReminders.first)
+        #expect(first.reminder.isOpen)  // breakfast is open at 8:00
+        await model.demoSend(first.reminder)
+        #expect(harness.notifications.sentReminders == [first.reminder])
+    }
+
+    @Test func pastOrdersSayWhenTheyWerePickedUpAndTheMilesWalked() async throws {
+        let (model, harness) = await orders(at: Fixture.sep(24, 11)) {
+            $0.add(Fixture.reservation(for: Self.breakfast, collectedAt: Fixture.sep(24, 8)))
+        }
+        #expect(model.past.first?.statusText == "Picked up today")
+        let id = try #require(model.past.first?.id)
+        _ = try await harness.walkRewards.startWalk(reservationID: id, restaurantID: "near", at: Fixture.sep(24, 7))
+        _ = try await harness.walkRewards.finishWalk(
+            reservationID: id, verdict: .credited(miles: 0.5), at: Fixture.sep(24, 8), calendar: .current)
+        await model.load()
+        #expect(model.past.first?.statusText == "Picked up today · +0.5 mi walked")
+    }
+
     @Test func emptyState() async {
         let (model, _) = await orders(at: Fixture.sep(24, 8)) { _ in }
         #expect(model.state == .empty)
@@ -65,7 +90,7 @@ struct OrdersModelTests {
             $0.add(Fixture.reservation(for: Self.breakfast, cancelledAt: Fixture.sep(24, 7)))
         }
         #expect(model.activeGroups.isEmpty)
-        #expect(model.past.map(\.statusText) == ["Cancelled", "Picked up"])  // newest first
+        #expect(model.past.map(\.statusText) == ["Cancelled", "Picked up today"])  // newest first
         let collected = try #require(model.past.last)
         #expect(collected.showsRatePrompt)
         #expect(model.impact.bagsRescued == 2)

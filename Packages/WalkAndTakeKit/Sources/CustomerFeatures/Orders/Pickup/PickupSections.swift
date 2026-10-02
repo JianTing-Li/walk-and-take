@@ -9,25 +9,58 @@ import DesignSystem
 import Domain
 import SwiftUI
 
+/// The pickup code and its QR, on the order screen and (smaller) on the confirmation sheet.
 struct PickupCodeCard: View {
     let code: String
+    /// The confirmation sheet's smaller version, so the pickup details fit above it.
+    var compact = false
+    var identifier = "pickup.code"
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.xs) {
             Text("Pickup code").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             Text(code)
-                .font(.pickupCode(size: 48))
-                .tracking(10)
+                .font(.pickupCode(size: compact ? 36 : 48))
+                .tracking(compact ? 8 : 10)
                 .accessibilityLabel("Pickup code \(code.map(String.init).joined(separator: " "))")
-                .accessibilityIdentifier("pickup.code")
-            QRCodeView(text: code, size: 150)
+                .accessibilityIdentifier(identifier)
+            QRCodeView(text: code, size: compact ? 110 : 150)
             Text("Show this to staff at the counter")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
+        .padding(.vertical, Spacing.l)
         .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.card))
+    }
+}
+
+/// A label and value. Long values (like "Pick up today, Thu Oct 1, 12:00–2:00 PM") move under the label
+/// instead of wrapping mid-range.
+struct SummaryRow: View {
+    let label: String
+    let value: String
+
+    init(_ label: String, _ value: String) {
+        self.label = label
+        self.value = value
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top) {
+                Text(label).foregroundStyle(.secondary)
+                Spacer()
+                Text(value).fontWeight(.semibold).lineLimit(1)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).foregroundStyle(.secondary)
+                Text(value).fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.subheadline)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -36,6 +69,8 @@ struct PickupSteps: View {
     let addressLine: String
     let instructions: String
     let directionsURL: URL?
+
+    @ScaledMetric(relativeTo: .subheadline) private var badge: CGFloat = 26
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
@@ -62,7 +97,7 @@ struct PickupSteps: View {
             Text("\(n)")
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
+                .frame(width: badge, height: badge)
                 .background(Color.splashTeal, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {

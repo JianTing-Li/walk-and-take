@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 import UIKit
 
@@ -14,6 +15,7 @@ public struct DiscoverView<Destination: View>: View {
     let destination: (DiscoverRoute) -> Destination
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     public init(
         model: DiscoverModel,
@@ -34,6 +36,11 @@ public struct DiscoverView<Destination: View>: View {
                     MapBrowseView(model: model.map) { navigation.discoverPath.append(.offer(id: $0)) }
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if model.developer.usesDemoControls {
+                    DemoMenuButton(title: "Demo · jump to", actions: demoActions).padding(Spacing.l)
+                }
+            }
             .navigationTitle(model.mode == .map ? "Map" : "Discover")
             .navigationBarTitleDisplayMode(model.mode == .map ? .inline : .automatic)
             .toolbar {
@@ -50,6 +57,18 @@ public struct DiscoverView<Destination: View>: View {
         }
         .tint(.splashTeal)
         .task { await model.run() }
+    }
+
+    /// Developer mode: jump the clock to when bags open, or back to now.
+    private var demoActions: [DemoAction] {
+        var actions = model.demoTimeJumps.map { jump in
+            DemoAction(jump.title, systemImage: "clock") { model.demoTravel(to: jump.date) }
+        }
+        if model.demoCanResetTime {
+            actions.append(
+                DemoAction("Back to live time", systemImage: "clock.arrow.circlepath") { model.demoResetTime() })
+        }
+        return actions
     }
 
     // MARK: - List
@@ -73,20 +92,16 @@ public struct DiscoverView<Destination: View>: View {
                             if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                         }
                     }
-                    CategoryChips(selection: $model.category)
-                    Picker("Sort", selection: $model.sort) {
-                        ForEach(model.availableSorts) { Text($0.rawValue).tag($0) }
+                    VStack(alignment: .leading, spacing: Spacing.s) {
+                        CategoryChips(selection: $model.category)
+                        sortPicker
                     }
-                    .pickerStyle(.segmented)
 
-                    if model.isListEmpty {
-                        EmptyStateView(
-                            "No bags right now", systemImage: "bag",
-                            message: "Check back soon. Stores add bags throughout the morning."
-                        )
-                        .padding(.top, 40)
+                    let sections = model.sections
+                    if sections.isEmpty {
+                        emptyState
                     } else {
-                        sections
+                        sectionsList(sections)
                     }
                 }
                 .padding(.horizontal, Spacing.l)
@@ -96,9 +111,44 @@ public struct DiscoverView<Destination: View>: View {
         }
     }
 
-    private var sections: some View {
+    /// Segmented normally; a menu at accessibility text sizes, where four segments would truncate.
+    @ViewBuilder
+    private var sortPicker: some View {
+        let picker = Picker("Sort", selection: $model.sort) {
+            ForEach(model.availableSorts) { Text($0.rawValue).tag($0) }
+        }
+        if dynamicTypeSize.isAccessibilitySize {
+            HStack {
+                Text("Sort").foregroundStyle(.secondary)
+                picker.pickerStyle(.menu)
+            }
+        } else {
+            picker.pickerStyle(.segmented)
+        }
+    }
+
+    /// With a category picked, the empty list is about that category, and "Show all" clears it.
+    @ViewBuilder
+    private var emptyState: some View {
+        if let category = model.category {
+            EmptyStateView(
+                "No \(category.label.lowercased()) bags right now", systemImage: category.symbol,
+                message: "Other stores near you still have bags.", actionTitle: "Show all"
+            ) { model.category = nil }
+            .padding(.top, Spacing.xxl)
+        } else {
+            EmptyStateView(
+                "No bags right now", systemImage: "bag",
+                message: "Check back soon. Stores add bags throughout the day."
+            )
+            .padding(.top, Spacing.xxl)
+        }
+    }
+
+    /// Takes the sections computed once per render (filtering and sorting aren't free).
+    private func sectionsList(_ sections: [DiscoverSection]) -> some View {
         LazyVStack(alignment: .leading, spacing: 14) {
-            ForEach(model.sections) { section in
+            ForEach(sections) { section in
                 if let title = section.title {
                     DayLabel(title, day: section.kind == .tonight ? .tonight : .tomorrow)
                         .padding(.top, section.kind == .tonight ? 0 : Spacing.xs)
@@ -132,7 +182,7 @@ private struct DiscoverHeaderView: View {
             Label("Near you · \(header.homeArea)", systemImage: "location.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.splashTeal)
-            Text("\(header.availableCount) bags to rescue within \(header.maxDistanceText) mi")
+            Text("^[\(header.availableCount) bag](inflect: true) to rescue within \(header.maxDistanceText) mi")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             if header.hiddenByPreferencesCount > 0 {

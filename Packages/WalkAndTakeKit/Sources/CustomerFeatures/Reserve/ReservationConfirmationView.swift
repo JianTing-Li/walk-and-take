@@ -22,29 +22,25 @@ struct ReservationConfirmationView: View {
 
                 VStack(spacing: 6) {
                     Text("You're all set!").font(.title.weight(.bold))
-                    Text("Show this code at \(confirmation.restaurantName) when you pick up")
+                    Text("Your bag at \(confirmation.restaurantName) is reserved.")
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
 
+                // When and where first: that's what to plan around.
                 VStack(spacing: Spacing.m) {
-                    Text(confirmation.code)
-                        .font(.pickupCode(size: 44))
-                        .tracking(8)
-                        .accessibilityLabel(
-                            "Pickup code \(confirmation.code.map(String.init).joined(separator: " "))"
-                        )
-                        .accessibilityIdentifier("confirmation.code")
-                    QRCodeView(text: confirmation.code, size: 140)
+                    SummaryRow("When", confirmation.pickupText)
+                    SummaryRow("Where", confirmation.address)
+                    SummaryRow("How", confirmation.pickupInstructions)
+                    SummaryRow("Bags", confirmation.bagsText)
+                    // The reward banner below already says what the reward saved.
+                    if confirmation.rewardRedeemed == nil, let rewardText = confirmation.rewardText {
+                        SummaryRow("Reward", rewardText)
+                    }
+                    SummaryRow("Total", confirmation.totalText)
                 }
-                .padding(.vertical, Spacing.m).padding(.horizontal, Spacing.xxl)
-                .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
-
-                if let redeemed = confirmation.rewardRedeemed {
-                    RewardBanner(title: redeemed.title, detail: redeemed.detail, footer: redeemed.footer)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("confirmation.rewardRedeemed")
-                }
+                .padding(Spacing.l)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
 
                 if let reminder = confirmation.walkReminderText {
                     Label(reminder, systemImage: "figure.walk")
@@ -56,23 +52,18 @@ struct ReservationConfirmationView: View {
                         .accessibilityIdentifier("confirmation.walkReminder")
                 }
 
+                PickupCodeCard(code: confirmation.code, compact: true, identifier: "confirmation.code")
+
+                if let redeemed = confirmation.rewardRedeemed {
+                    RewardBanner(title: redeemed.title, detail: redeemed.detail, footer: redeemed.footer)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("confirmation.rewardRedeemed")
+                }
+
                 Text(confirmation.policyText)
                     .multilineTextAlignment(.center)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-
-                VStack(spacing: Spacing.m) {
-                    row("When", confirmation.pickupText)
-                    row("Where", confirmation.address)
-                    row("How", confirmation.pickupInstructions)
-                    row("Bags", confirmation.bagsText)
-                    if let rewardText = confirmation.rewardText {
-                        row("Reward", rewardText)
-                    }
-                    row("Total", confirmation.totalText)
-                }
-                .padding(Spacing.l)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
             }
             .padding(Spacing.xl)
         }
@@ -98,13 +89,4 @@ struct ReservationConfirmationView: View {
         .presentationDetents([.large])
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).fontWeight(.semibold).multilineTextAlignment(.trailing)
-        }
-        .font(.subheadline)
-        .accessibilityElement(children: .combine)
-    }
 }

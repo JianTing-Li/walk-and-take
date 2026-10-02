@@ -28,6 +28,15 @@ struct RateOrderModelTests {
         return (model, harness)
     }
 
+    @Test func aLoadErrorIsNotNotFound() async {
+        let harness = Harness(now: Fixture.sep(24, 9), offers: [Self.offer])
+        let reservation = harness.marketplace.add(Fixture.reservation(for: Self.offer, collectedAt: Fixture.sep(24, 8)))
+        harness.marketplace.failReads(true)
+        let model = RateOrderModel(reservationID: reservation.id, initialStars: 4, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.state == .failed("Couldn't load this order. Please try again."))
+    }
+
     @Test func startsWithTheTappedStars() async {
         let (model, _) = await rate(stars: 4)
         #expect(model.state == .rating)
@@ -137,6 +146,28 @@ struct ProfileModelTests {
         #expect(navigation.discoverPath == [.offer(id: "x")])
     }
 
+    @Test func developerModeStartsOffAndDrivesTheAppClock() async {
+        let (model, harness, _) = await profile()
+        #expect(!model.developer.isOn)
+        model.developer.isOn = true
+        #expect(harness.developer.isOn)
+        let lunch = Fixture.sep(24, 12, 30)
+        model.demo.travel(to: lunch)
+        #expect(harness.clock.now == lunch)
+        #expect(!model.demo.isTimeLive)
+    }
+
+    @Test func turningDeveloperModeOffPutsEverythingBack() async {
+        let (model, harness, _) = await profile()
+        model.setDeveloperMode(true)
+        model.developer.fixedLocation = true
+        model.demo.travel(to: Fixture.sep(24, 12, 30))
+        model.setDeveloperMode(false)
+        #expect(!harness.developer.isOn)
+        #expect(!harness.developer.fixedLocation)
+        #expect(harness.clock.isLive)
+    }
+
     @Test func flagsControlSections() async {
         let (model, _, _) = await profile()
         #expect(model.flags.impact && model.flags.dietaryFilters && !model.flags.commute)
@@ -165,6 +196,7 @@ struct ProfileModelTests {
         #expect(card.targetTitle == "First reward: 50% off one bag at 1 mi")
         #expect(card.targetDetail == "1.0 mi to go")
         #expect(card.progress == 0)
+        #expect(card.ticks == [0.25, 0.5, 0.75])  // quarter miles on the way to 1 mi
         #expect(card.readyText == nil)
     }
 
@@ -175,6 +207,7 @@ struct ProfileModelTests {
         #expect(card.targetTitle == "Next: 50% off one bag at 5 mi")
         #expect(card.targetDetail == "3.8 mi to go")
         #expect(abs(card.progress - 0.05) < 1e-9)
+        #expect(card.ticks == [0.25, 0.5, 0.75])  // 2, 3 and 4 mi between 1 and 5
         #expect(card.readyText == "1 reward ready to use")
         #expect(model.availableRewards == 1)
     }
@@ -209,6 +242,45 @@ struct ProfileModelTests {
     @Test func resettingClearsMilesAndRewards() async {
         let (model, _) = await profileWithWalks(miles: 6, rewards: [Self.reward()])
         await model.resetDemoData()
+        #expect(model.walkMiles == 0)
+        #expect(model.availableRewards == 0)
+    }
+
+    // MARK: Developer mode: rewards
+
+    @Test func demoMilesMoveTheBarAndCrossingAMilestoneCelebrates() async {
+        let (model, _) = await profileWithWalks(miles: 0.6)
+        await model.demoAddMiles(0.2)
+        #expect(abs(model.walkMiles - 0.8) < 1e-9)
+        #expect(model.rewardUnlock == nil)
+        await model.demoAddMiles(0.5)  // past 1 mi
+        #expect(model.availableRewards == 1)
+        #expect(model.rewardUnlock?.title == "Reward unlocked")
+        #expect(model.rewardUnlock?.detail == "50% off one bag is ready to use.")
+    }
+
+    @Test func completingTheMilestoneLandsExactlyOnIt() async throws {
+        let (model, harness) = await profileWithWalks(miles: 1.2, rewards: [Self.reward()])
+        await model.demoCompleteMilestone()
+        #expect(abs(model.walkMiles - 5) < 0.001)
+        #expect(try await harness.walkRewards.rewards().map(\.milestoneMiles) == [1, 5])
+        let card = try #require(model.walkProgress)
+        #expect(card.targetTitle == "Next: 50% off one bag at 15 mi")
+        #expect(model.rewardUnlock != nil)
+    }
+
+    @Test func aGrantedRewardLooksEarnedButLeavesMilesAlone() async throws {
+        let (model, harness) = await profileWithWalks(miles: 1.2, rewards: [Self.reward()])
+        await model.demoGrantReward()
+        #expect(abs(model.walkMiles - 1.2) < 1e-9)
+        #expect(model.availableRewards == 2)
+        #expect(try await harness.walkRewards.rewards().last?.milestoneMiles == 5)  // the next milestone
+        #expect(model.rewardUnlock?.title == "Reward added")
+    }
+
+    @Test func clearingStartsWalkingRewardsOver() async {
+        let (model, _) = await profileWithWalks(miles: 6, rewards: [Self.reward(), Self.reward(at: 5)])
+        await model.demoClearWalksAndRewards()
         #expect(model.walkMiles == 0)
         #expect(model.availableRewards == 0)
     }

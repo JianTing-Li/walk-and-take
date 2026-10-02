@@ -53,21 +53,6 @@ enum WalkCopy {
             : nil
     }
 
-    /// How an offer compares with the nearest reservable one, by walking distance.
-    /// "Nearest bag", or "0.4 mi farther than the nearest · earns 0.4 mi more". Distances are compared as shown
-    /// (rounded to a tenth) so the line always agrees with the "0.5 mi away" text.
-    static func compareText(distance: Double, nearest: Double) -> String? {
-        let shown = (distance * 10).rounded() / 10
-        let base = (nearest * 10).rounded() / 10
-        let farther = shown - base
-        guard farther > 0.05 else { return "Nearest bag" }
-        // Earned miles come from the same rounded distances, so "farther" and "earns more" agree.
-        let extra = ((earnedMiles(forDistance: shown) - earnedMiles(forDistance: base)) * 10).rounded() / 10
-        var text = "\(miles(farther)) mi farther than the nearest"
-        if extra > 0.05 { text += " · earns \(miles(extra)) mi more" }
-        return text
-    }
-
     /// After-pickup progress: "After this pickup: 1.7 of 5 mi · 3.3 mi to go", or just the total once a
     /// milestone is reached (the unlock line carries the news).
     static func outcomeText(currentMiles: Double, distance: Double) -> String {
@@ -92,9 +77,6 @@ enum WalkCopy {
 
     // MARK: Reminders
 
-    /// Reserve bar: miles only count for walkers who start the walk in the app.
-    static let reserveReminder = "Miles count only if you walk to pickup and tap Start walk on your order."
-
     /// Confirmation sheet: when Start walk opens, and that driving or riding earns nothing.
     static func confirmationReminder(startOpensAt: Date, now: Date, calendar: Calendar) -> String {
         let steps = "then swipe to confirm when you arrive. Driving or riding earns no miles."
@@ -110,17 +92,24 @@ enum WalkCopy {
 
     // MARK: Live progress
 
-    /// "0.3 mi walked · 0.2 mi to go", or "You've arrived" once at the door.
-    static func progressText(_ progress: WalkProgress) -> String {
-        let arrived = progress.milesToGo * 1609.344 <= WalkVerifier.endRadiusMiles * 1609.344
-        let walked = "\(miles(progress.creditedMiles, places: 2)) mi walked"
-        return arrived
-            ? "\(walked) · You're at the door" : "\(walked) · \(miles(progress.milesToGo, places: 2)) mi to go"
+    /// At the door: within the radius the final check accepts as "arrived".
+    static func isAtDoor(_ progress: WalkProgress) -> Bool {
+        progress.milesToGo <= WalkVerifier.endRadiusMiles
     }
 
-    /// "Counting +0.30 mi so far" once some of the walk counts.
-    static func countingText(_ progress: WalkProgress) -> String? {
-        progress.creditedMiles > 0 ? "Counting +\(miles(progress.creditedMiles, places: 2)) mi so far" : nil
+    /// "0.3 mi walked"
+    static func walkedText(_ progress: WalkProgress) -> String {
+        "\(miles(progress.creditedMiles)) mi walked"
+    }
+
+    /// "0.3 mi walked · 0.2 mi to go"
+    static func progressText(_ progress: WalkProgress) -> String {
+        "\(walkedText(progress)) · \(miles(progress.milesToGo)) mi to go"
+    }
+
+    /// Tick marks every 0.1 mi along a walk (every 0.25 mi past a mile), as 0...1 positions.
+    static func walkTicks(forDistance distance: Double) -> [Double] {
+        MilestoneProgressBar.ticks(from: 0, to: distance, every: distance <= 1 ? 0.1 : 0.25)
     }
 
     // MARK: Earned
@@ -128,14 +117,14 @@ enum WalkCopy {
     /// The card after a walked pickup, from what that pickup added to the customer's history.
     static func earnedCard(_ earnings: WalkEarnings) -> WalkEarnedCard.Content {
         let discount = "\(WalkRewardLadder.discountPercent)% off one bag"
-        let earned = miles(earnings.milesEarned, places: 2)
+        let earned = miles(earnings.milesEarned)
         return WalkEarnedCard.Content(
             headline: "+\(earned) mi earned",
             catchphrase: earnings.catchphrase,
-            contribution: "Walked pickup #\(earnings.walkNumber) · added \(earned) mi",
+            contribution: "Walked pickup #\(earnings.walkNumber)",
             progress:
-                "\(miles(earnings.totalAfter, places: 2)) mi walked in total · "
-                + "\(miles(earnings.milesToNextReward, places: 2)) mi to your next reward",
+                "\(miles(earnings.totalAfter)) mi walked in total · "
+                + "\(miles(earnings.milesToNextReward)) mi to your next reward",
             unlock: earnings.unlockedMilestones.isEmpty
                 ? nil
                 : earnings.unlockedMilestones.count == 1

@@ -76,11 +76,11 @@ public final class WalkHistoryModel {
             let earnings = WalkEarnings.of(walk, in: walks)
             return Row(
                 id: walk.id,
-                title: names[walk.restaurantID] ?? "Walk & Take pickup",
+                title: walk.isDemo ? "Demo walk" : names[walk.restaurantID] ?? "Walk & Take pickup",
                 dateText:
                     "\(TimeText.shortDate(finishedAt, calendar: calendar)) · \(TimeText.time(finishedAt, calendar: calendar))",
-                milesText: walk.creditedMiles > 0 ? "+\(WalkCopy.miles(walk.creditedMiles, places: 2)) mi" : "0 mi",
-                detail: earnings.map { "\(WalkCopy.miles($0.totalAfter, places: 2)) mi walked in total" }
+                milesText: walk.creditedMiles > 0 ? "+\(WalkCopy.miles(walk.creditedMiles)) mi" : "0 mi",
+                detail: earnings.map { "\(WalkCopy.miles($0.totalAfter)) mi walked in total" }
                     ?? walk.rejection?.message ?? "No miles counted.",
                 earnedMiles: walk.creditedMiles > 0)
         }
@@ -89,6 +89,6 @@ public final class WalkHistoryModel {
         let total = counted.reduce(0) { $0 + $1.creditedMiles }
         summaryText =
             "\(finished.count) walked \(finished.count == 1 ? "pickup" : "pickups") · "
-            + "\(WalkCopy.miles(total, places: 2)) mi counted"
+            + "\(WalkCopy.miles(total)) mi counted"
     }
 }

@@ -9,9 +9,10 @@ import SwiftUI
 /// The category-tinted gradient with its symbol, used as a bag's "photo".
 public struct CategoryGradient: View {
     let category: FoodCategory
-    let symbolSize: CGFloat
+    /// Nil leaves the symbol off, for screens that place it themselves.
+    let symbolSize: CGFloat?
 
-    public init(category: FoodCategory, symbolSize: CGFloat) {
+    public init(category: FoodCategory, symbolSize: CGFloat?) {
         self.category = category
         self.symbolSize = symbolSize
     }
@@ -22,10 +23,12 @@ public struct CategoryGradient: View {
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         .overlay {
-            Image(systemName: category.symbol)
-                .font(.system(size: symbolSize))
-                .foregroundStyle(.white.opacity(0.9))
-                .accessibilityHidden(true)
+            if let symbolSize {
+                Image(systemName: category.symbol)
+                    .font(.system(size: symbolSize))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .accessibilityHidden(true)
+            }
         }
     }
 }

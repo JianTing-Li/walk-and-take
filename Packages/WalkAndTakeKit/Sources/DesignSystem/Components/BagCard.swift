@@ -30,14 +30,12 @@ public struct BagCard: View {
         public var fitsCommute: Bool
         /// e.g. "+0.7 mi toward a reward". Nil hides the pill (flag off or not reservable).
         public var walkRewardText: String?
-        /// e.g. "0.4 mi farther than the nearest · earns 0.4 mi more", or "Nearest bag".
-        public var walkCompareText: String?
 
         public init(
             restaurantName: String, bagName: String, category: FoodCategory, badgeText: String,
             isUrgent: Bool, savingsPercent: Int, rating: Double?, reviewCount: Int, pickupText: String,
             distanceText: String, price: Money, estimatedValue: Money, isAvailable: Bool, fitsCommute: Bool,
-            walkRewardText: String? = nil, walkCompareText: String? = nil
+            walkRewardText: String? = nil
         ) {
             self.restaurantName = restaurantName
             self.bagName = bagName
@@ -54,7 +52,6 @@ public struct BagCard: View {
             self.isAvailable = isAvailable
             self.fitsCommute = fitsCommute
             self.walkRewardText = walkRewardText
-            self.walkCompareText = walkCompareText
         }
     }
 
@@ -80,26 +77,33 @@ public struct BagCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// 100 pt tall like the draft, but grows with large text so the badge never clips.
+    /// A short colored band (it grows with large text so badges never clip). The category symbol sits to
+    /// the right, clear of the badges and the heart.
     private var header: some View {
         HStack(alignment: .top) {
             StatusBadge(text: content.badgeText, isUrgent: content.isUrgent)
             if content.isAvailable {
-                Text("-\(content.savingsPercent)%")
+                Text("−\(content.savingsPercent)%")
                     .font(.caption.weight(.heavy))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Color.yolk, in: Capsule())
                     .foregroundStyle(.black)
                     .fixedSize()
             }
-            Spacer()
+            Spacer(minLength: Spacing.xs)
+            Image(systemName: content.category.symbol)
+                .font(.system(size: 26))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(maxHeight: .infinity)
+                .accessibilityHidden(true)
             if let onToggleFavorite {
                 FavoriteButton(isFavorite: isFavorite, action: onToggleFavorite)
             }
         }
         .padding(Spacing.s)
-        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        .background { CategoryGradient(category: content.category, symbolSize: 42) }
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
+        .background { CategoryGradient(category: content.category, symbolSize: nil) }
     }
 
     private var details: some View {
@@ -124,9 +128,6 @@ public struct BagCard: View {
 
             if let walkRewardText = content.walkRewardText, content.isAvailable {
                 WalkRewardPill(walkRewardText)
-                if let compare = content.walkCompareText {
-                    Text(compare).font(.caption).foregroundStyle(.secondary)
-                }
             }
 
             // Stacks vertically at large text sizes so times and prices never truncate.

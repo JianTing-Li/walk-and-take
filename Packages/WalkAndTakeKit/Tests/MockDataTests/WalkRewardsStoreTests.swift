@@ -38,6 +38,27 @@ struct WalkRewardsStoreTests {
             calendar: calendar)
     }
 
+    // MARK: Developer mode
+
+    @Test func aBankedRewardLeavesMilesAlone() async throws {
+        let store = try await TestEnv.makeStores().userData
+        try await walk(store, miles: 0.4)
+        let reward = try await store.bankReward(milestoneMiles: 1, at: now)
+        #expect(try await store.rewards() == [reward])
+        #expect(abs(try await store.totalMiles() - 0.4) < 1e-9)
+    }
+
+    @Test func clearingRemovesFinishedWalksAndRewardsButNotOpenOnes() async throws {
+        let store = try await TestEnv.makeStores().userData
+        try await walk(store, miles: 1.2)
+        let open = UUID()
+        _ = try await store.startWalk(reservationID: open, restaurantID: "rst_b", at: now)
+        try await store.clearWalksAndRewards()
+        #expect(try await store.totalMiles() == 0)
+        #expect(try await store.rewards().isEmpty)
+        #expect(try await store.walks().map(\.reservationID) == [open])
+    }
+
     @Test func startingTwiceReturnsTheSameWalk() async throws {
         let store = try await TestEnv.makeStores().userData
         let id = UUID()

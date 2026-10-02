@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 
 struct PickupView<RateSheet: View>: View {
@@ -50,10 +51,13 @@ struct PickupView<RateSheet: View>: View {
             VStack(spacing: Spacing.xl) {
                 if let header = model.header { StatusHeader(header: header) }
 
+                // Ready for pickup: the code goes first, right above the swipe.
+                if model.status == .readyNow { PickupCodeCard(code: model.code) }
+
                 if let section = model.walkSection { walkSection(section) }
 
                 if model.isActive {
-                    PickupCodeCard(code: model.code)
+                    if model.status != .readyNow { PickupCodeCard(code: model.code) }
                     PickupSteps(
                         restaurantName: model.restaurantName, addressLine: model.addressLine,
                         instructions: model.pickupInstructions, directionsURL: model.directionsURL)
@@ -99,7 +103,15 @@ struct PickupView<RateSheet: View>: View {
             .padding(Spacing.l)
         }
         .background(Color(.systemGroupedBackground))
+        .overlay(alignment: .bottomTrailing) {
+            if model.developer.usesDemoControls, model.isActive {
+                DemoMenuButton(title: "Demo · this order", actions: demoActions)
+                    .padding(Spacing.l)
+            }
+        }
         .safeAreaInset(edge: .bottom) { bottomBar }
+        .sensoryFeedback(.success, trigger: model.status == .collected)
+        .sensoryFeedback(.start, trigger: model.walk != nil) { _, started in started }
     }
 
     @ViewBuilder
@@ -125,52 +137,67 @@ struct PickupView<RateSheet: View>: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.splashTeal)
+                .disabled(model.isStartingWalk)
                 .accessibilityIdentifier("pickup.startWalk")
             }
         case .walking(let walking):
-            VStack(alignment: .leading, spacing: 6) {
-                Label(walking.title, systemImage: "figure.walk.motion")
-                    .font(.headline)
-                    .foregroundStyle(Color.splashTeal)
-                if let fraction = walking.fraction {
-                    ProgressView(value: fraction)
-                        .tint(Color.splashTeal)
-                        .accessibilityHidden(true)
-                }
-                Text(walking.progressText)
-                    .font(.subheadline.weight(.semibold))
-                    .accessibilityIdentifier("pickup.walkProgress")
-                if let counting = walking.countingText {
-                    Text(counting).font(.footnote.weight(.semibold)).foregroundStyle(Color.splashTeal)
-                }
-                Text(walking.detail).font(.subheadline).foregroundStyle(.secondary)
-                if let warning = walking.warning {
-                    Label(warning, systemImage: "location.slash.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.orange)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Spacing.l)
-            .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("pickup.walkInProgress")
+            WalkingCard(walking: walking)
         }
+    }
+
+    // MARK: Developer mode
+
+    private var startNowAction: DemoAction {
+        DemoAction("Start walk now", systemImage: "figure.walk") { Task { await model.startWalkNow() } }
+    }
+
+    private func walkActions(_ isAutoWalking: Bool) -> [DemoAction] {
+        [
+            DemoAction("+0.1 mi", systemImage: "plus") { Task { await model.demoStep() } },
+            isAutoWalking
+                ? DemoAction("Pause", systemImage: "pause.fill") { Task { await model.demoToggleAutoWalk() } }
+                : DemoAction("Auto-walk", systemImage: "play.fill") { Task { await model.demoToggleAutoWalk() } },
+            DemoAction("Arrive now", systemImage: "flag.checkered") { Task { await model.demoArrive() } },
+        ]
+    }
+
+    /// What the Demo button can do on this order right now: the walk first, then the clock.
+    private var demoActions: [DemoAction] {
+        var actions: [DemoAction] = []
+        switch model.demoWalkControls {
+        case .startNow: actions.append(startNowAction)
+        case .simulated(let isAutoWalking, false): actions += walkActions(isAutoWalking)
+        default: break
+        }
+        if model.isActive {
+            actions.append(
+                DemoAction("Send pickup reminder", systemImage: "bell.badge") {
+                    Task { await model.demoSendReminder() }
+                })
+            actions.append(
+                DemoAction("Confirm pickup now", systemImage: "checkmark.seal") {
+                    Task { await model.demoConfirmPickup() }
+                })
+        }
+        if model.canOpenPickupNow {
+            actions.append(
+                DemoAction("Open pickup now", systemImage: "clock.badge.checkmark") { model.openPickupNow() })
+        }
+        if model.canJumpToClosing {
+            actions.append(
+                DemoAction("Jump to 5 min before pickup ends", systemImage: "hourglass.bottomhalf.filled") {
+                    model.jumpToClosing()
+                })
+        }
+        return actions
     }
 
     @ViewBuilder
     private var bottomBar: some View {
         if model.status == .readyNow {
             SwipeToConfirm(title: "Swipe to confirm pickup") { Task { await model.collect() } }
+                .id(model.collectFailed)  // a failed confirm resets the knob so you can try again
                 .padding(Spacing.l)
-                .background(.bar)
-        } else if let text = model.confirmFromText {
-            Text(text)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(Spacing.xl)
                 .background(.bar)
         }
     }
@@ -178,13 +205,7 @@ struct PickupView<RateSheet: View>: View {
     private var summary: some View {
         VStack(spacing: Spacing.s) {
             ForEach(model.summary, id: \.label) { row in
-                HStack(alignment: .top) {
-                    Text(row.label).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(row.value).fontWeight(.semibold).multilineTextAlignment(.trailing)
-                }
-                .font(.subheadline)
-                .accessibilityElement(children: .combine)
+                SummaryRow(row.label, row.value)
             }
         }
         .padding(Spacing.l)
@@ -214,8 +235,57 @@ extension PickupStatusPill.Tone {
         switch self {
         case .readyNow: .splashTeal
         case .upcoming: .orange
-        case .collected: .green
+        case .collected: .splashTeal
         case .inactive: .secondary
         }
+    }
+}
+
+/// The walk card while recording. Shrinks to one line once you're at the door and can confirm.
+private struct WalkingCard: View {
+    let walking: PickupModel.WalkSection.Walking
+
+    var body: some View {
+        Group {
+            if walking.phase == .arrived {
+                Label(walking.title, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.splashTeal)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.m)
+            } else {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Label(
+                        walking.title,
+                        systemImage: walking.phase == .arrivedEarly ? "checkmark.circle.fill" : "figure.walk.motion"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(Color.splashTeal)
+                    MilestoneProgressBar(
+                        value: walking.fraction, ticks: walking.ticks, fill: .splashTeal,
+                        track: Color.splashTeal.opacity(0.15)
+                    )
+                    .padding(.vertical, Spacing.xxs)
+                    Text(walking.progressText)
+                        .font(.subheadline.weight(.semibold))
+                        .contentTransition(.numericText())
+                        .accessibilityIdentifier("pickup.walkProgress")
+                    if let detail = walking.detail {
+                        Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if let warning = walking.warning {
+                        Label(warning, systemImage: "location.slash.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Spacing.l)
+            }
+        }
+        .background(Color.yolk.opacity(0.25), in: RoundedRectangle(cornerRadius: Radius.panel))
+        .animation(.default, value: walking)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("pickup.walkInProgress")
     }
 }

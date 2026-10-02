@@ -20,6 +20,10 @@ public struct CustomerDependencies: Sendable {
     public var resetter: any DemoDataResetting
     public var clock: any Clock
     public var flags: FeatureFlags
+    /// Developer mode's switches.
+    public var developer: DeveloperSettings
+    /// Developer mode's demo actions (time travel and, later, walks and rewards).
+    public var demo: any DemoControlling
 
     public init(
         offers: any OfferRepository,
@@ -33,7 +37,9 @@ public struct CustomerDependencies: Sendable {
         notifications: any NotificationScheduler,
         resetter: any DemoDataResetting,
         clock: any Clock,
-        flags: FeatureFlags
+        flags: FeatureFlags,
+        developer: DeveloperSettings,
+        demo: any DemoControlling
     ) {
         self.offers = offers
         self.reservations = reservations
@@ -47,5 +53,7 @@ public struct CustomerDependencies: Sendable {
         self.resetter = resetter
         self.clock = clock
         self.flags = flags
+        self.developer = developer
+        self.demo = demo
     }
 }

@@ -5,6 +5,7 @@
 
 import Domain
 import Foundation
+import OSLog
 import UserNotifications
 
 public struct LiveNotificationScheduler: NotificationScheduler {
@@ -35,7 +36,7 @@ public struct LiveNotificationScheduler: NotificationScheduler {
                 content: Self.content(for: alert),
                 trigger: trigger
             )
-            try? await center.add(request)
+            await add(request)
         }
     }
 
@@ -56,14 +57,42 @@ public struct LiveNotificationScheduler: NotificationScheduler {
         center.removeAllPendingNotificationRequests()
     }
 
-    public func sendPreview(_ alert: OfferAlert) async {
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: NotificationPlan.previewDelay, repeats: false)
+    public func sendPreview(_ alert: OfferAlert, after delay: TimeInterval) async {
+        // The trigger needs a positive interval; one second is "now" for a banner.
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, delay), repeats: false)
         let request = UNNotificationRequest(
             identifier: NotificationPlan.previewPrefix + UUID().uuidString,
             content: Self.content(for: alert),
             trigger: trigger
         )
-        try? await center.add(request)
+        await add(request)
+    }
+
+    public func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async {
+        let content = UNMutableNotificationContent()
+        content.title = NotificationPlan.title(for: reminder)
+        content.body = NotificationPlan.body(for: reminder)
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: NotificationPlan.reminderPrefix + reminder.reservationID.uuidString,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: max(1, delay), repeats: false)
+        )
+        await add(request)
+    }
+
+    private static let log = Logger(subsystem: "org.pursuit.Walk-And-Take", category: "Notifications")
+
+    /// Schedules a request, logging (instead of hiding) a refusal, e.g. iOS dropping alerts for an app
+    /// it no longer has registered.
+    private func add(_ request: UNNotificationRequest) async {
+        do {
+            try await center.add(request)
+        } catch {
+            Self.log.error(
+                "Couldn't schedule \(request.identifier, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+        }
     }
 
     private static func content(for alert: OfferAlert) -> UNMutableNotificationContent {

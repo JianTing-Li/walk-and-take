@@ -190,6 +190,23 @@ nonisolated final class FakeWalkRewards: WalkRewardsRepository, Sendable {
         return reward
     }
 
+    /// Developer mode: a reward without miles.
+    func bank(milestoneMiles: Double, at now: Date) -> Reward {
+        let reward = Reward(milestoneMiles: milestoneMiles, earnedAt: now)
+        state.withLock { $0.rewards.append(reward) }
+        broadcaster.send(.walkRewardsChanged)
+        return reward
+    }
+
+    /// Developer mode: finished walks and every reward gone.
+    func clear() {
+        state.withLock { s in
+            s.walks.removeAll { $0.finishedAt != nil }
+            s.rewards.removeAll()
+        }
+        broadcaster.send(.walkRewardsChanged)
+    }
+
     func releaseReward(reservationID: UUID) async throws {
         state.withLock { s in
             for i in s.rewards.indices where s.rewards[i].redeemedReservationID == reservationID {
@@ -221,7 +238,18 @@ nonisolated final class FakeNotifications: NotificationScheduler, Sendable {
     func replaceAll(with alerts: [OfferAlert], now: Date) async {}
     func cancel(offerIDs: [String]) async {}
     func cancelAll() async {}
-    func sendPreview(_ alert: OfferAlert) async { previews.withLock { $0.append(alert.offerID) } }
+    func sendPreview(_ alert: OfferAlert, after delay: TimeInterval) async {
+        previews.withLock { $0.append(alert.offerID) }
+        delays.withLock { $0.append(delay) }
+    }
+    private let delays = Mutex<[TimeInterval]>([])
+    private let reminders = Mutex<[PickupReminder]>([])
+    var sentReminders: [PickupReminder] { reminders.withLock { $0 } }
+    func sendReminder(_ reminder: PickupReminder, after delay: TimeInterval) async {
+        reminders.withLock { $0.append(reminder) }
+    }
+    /// Seconds before each preview fires, in order.
+    var previewDelays: [TimeInterval] { delays.withLock { $0 } }
 }
 
 /// Wipes the fakes the way DemoDataResetter wipes the stores.
@@ -299,12 +327,13 @@ nonisolated enum Fixture {
     /// A reservation for `offer` as it looked when reserved.
     static func reservation(
         for offer: Offer, quantity: Int = 1, reservedAt: Date = sep(24, 6), collectedAt: Date? = nil,
-        cancelledAt: Date? = nil, review: Review? = nil
+        cancelledAt: Date? = nil, review: Review? = nil, rewardID: UUID? = nil
     ) -> Reservation {
         Reservation(
             id: UUID(), confirmationCode: "QW3E", quantity: quantity,
             snapshot: OfferSnapshot(offer: offer, restaurant: restaurants.first { $0.id == offer.restaurantID }!),
-            reservedAt: reservedAt, collectedAt: collectedAt, cancelledAt: cancelledAt, review: review)
+            reservedAt: reservedAt, collectedAt: collectedAt, cancelledAt: cancelledAt, review: review,
+            rewardID: rewardID)
     }
 
     static func offer(
@@ -333,6 +362,8 @@ struct Harness {
     let clock: AdjustableClock
     let notifications = FakeNotifications()
     let resetter: FakeResetter
+    let developer: DeveloperSettings
+    let demo: FakeDemoController
     let dependencies: CustomerDependencies
 
     init(
@@ -347,13 +378,84 @@ struct Harness {
         userData = FakeUserData(preferences: preferences, favorites: favorites)
         clock = AdjustableClock(fixedAt: now)
         resetter = FakeResetter(marketplace: marketplace, userData: userData, walkRewards: walkRewards)
+        developer = DeveloperSettings(defaults: freshDefaults())
+        demo = FakeDemoController(clock: clock)
+        demo.walkRewards = walkRewards
         dependencies = CustomerDependencies(
             offers: marketplace, reservations: marketplace, reviews: marketplace, favorites: userData,
             preferences: userData, walkRewards: walkRewards, walkTracker: walkTracker,
             location: FakeLocation(result: location),
             notifications: notifications,
-            resetter: resetter, clock: clock, flags: flags)
+            resetter: resetter, clock: clock, flags: flags, developer: developer, demo: demo)
     }
+}
+
+/// A UserDefaults suite of its own, so tests never share Developer mode switches.
+func freshDefaults() -> UserDefaults {
+    let name = "WalkAndTakeTests.\(UUID().uuidString)"
+    return UserDefaults(suiteName: name)!
+}
+
+/// Demo actions on the test clock.
+@MainActor
+final class FakeDemoController: DemoControlling {
+    let clock: AdjustableClock
+
+    init(clock: AdjustableClock) {
+        self.clock = clock
+    }
+
+    var now: Date { clock.now }
+    var isTimeLive: Bool { clock.isLive }
+    func travel(to date: Date) { clock.travel(to: date) }
+    func advanceTime(by interval: TimeInterval) { clock.advance(by: interval) }
+    func resetTimeToLive() { clock.resetToLive() }
+
+    /// Walks the test marks as simulated, and the demo calls made on them.
+    var simulatedWalks: Set<UUID> = []
+    var autoWalking: Set<UUID> = []
+    private(set) var walkCalls: [String] = []
+
+    func isSimulatedWalk(_ id: UUID) async -> Bool { simulatedWalks.contains(id) }
+    func isAutoWalking(_ id: UUID) async -> Bool { autoWalking.contains(id) }
+    func advanceWalk(_ id: UUID, miles: Double) async {
+        walkCalls.append("advance \(miles)")
+        autoWalking.remove(id)
+    }
+    func arriveWalk(_ id: UUID) async { walkCalls.append("arrive") }
+    func autoWalk(_ id: UUID) async {
+        walkCalls.append("auto")
+        autoWalking.insert(id)
+    }
+    func pauseWalk(_ id: UUID) async {
+        walkCalls.append("pause")
+        autoWalking.remove(id)
+    }
+
+    /// Rewards actions go to the fake walk rewards, through the same rules as the real store.
+    var walkRewards: FakeWalkRewards?
+
+    func addMiles(_ miles: Double) async -> [Reward] {
+        guard let walkRewards else { return [] }
+        let id = UUID()
+        _ = try? await walkRewards.startWalk(reservationID: id, restaurantID: "demo-\(id)", at: clock.now)
+        return
+            (try? await walkRewards.finishWalk(
+                reservationID: id, verdict: .credited(miles: miles), at: clock.now, calendar: .current))?.newRewards
+            ?? []
+    }
+
+    func completeNextMilestone() async -> [Reward] {
+        let total = (try? await walkRewards?.totalMiles()) ?? 0
+        return await addMiles(WalkRewardLadder.milesToNext(totalMiles: total) + 1e-6)
+    }
+
+    func grantReward() async -> Reward? {
+        let total = (try? await walkRewards?.totalMiles()) ?? 0
+        return walkRewards?.bank(milestoneMiles: WalkRewardLadder.nextMilestone(after: total), at: clock.now)
+    }
+
+    func clearWalksAndRewards() async { walkRewards?.clear() }
 }
 
 /// Polls until `condition` holds (for stream-driven updates), up to ~2 s.

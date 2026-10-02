@@ -5,6 +5,7 @@
 
 import DesignSystem
 import Domain
+import Platform
 import SwiftUI
 import UIKit
 
@@ -14,6 +15,7 @@ public struct FavoritesView<Destination: View>: View {
     let destination: (FavoritesRoute) -> Destination
 
     @Environment(\.openURL) private var openURL
+    @ScaledMetric(relativeTo: .body) private var chevronWidth: CGFloat = 19
 
     public init(
         model: FavoritesModel,
@@ -28,6 +30,19 @@ public struct FavoritesView<Destination: View>: View {
     public var body: some View {
         NavigationStack(path: $navigation.favoritesPath) {
             content
+                .overlay(alignment: .bottomTrailing) {
+                    if model.developer.usesDemoControls {
+                        DemoMenuButton(
+                            title: "Demo · alerts arrive in 1 s",
+                            actions: model.demoAlerts.map { item in
+                                DemoAction(item.title, systemImage: "bell.badge") {
+                                    Task { await model.demoFire(item.alert) }
+                                }
+                            }
+                        )
+                        .padding(Spacing.l)
+                    }
+                }
                 .navigationTitle("Favorites")
                 .navigationDestination(for: FavoritesRoute.self, destination: destination)
                 .alert("Notifications are off", isPresented: $model.notificationsBlocked) {
@@ -59,7 +74,7 @@ public struct FavoritesView<Destination: View>: View {
                 message: model.showsAlerts
                     ? "Tap the heart on any store to save it here. Turn on alerts to hear when it has bags."
                     : "Tap the heart on any store to save it here.",
-                actionTitle: "Browse stores"
+                actionTitle: "Find food nearby"
             ) { navigation.selectedTab = .discover }
         case .loaded:
             list
@@ -84,17 +99,6 @@ public struct FavoritesView<Destination: View>: View {
                 }
             }
 
-            if model.showsAlerts {
-                Section {
-                    Button {
-                        Task { await model.sendPreview() }
-                    } label: {
-                        Label(model.previewSent ? "Alert on its way…" : "Preview an alert", systemImage: "bell.badge")
-                    }
-                } footer: {
-                    Text("Sends a sample alert in 5 seconds so you can see what it looks like.")
-                }
-            }
         }
     }
 
@@ -107,7 +111,7 @@ public struct FavoritesView<Destination: View>: View {
             NavigationLink(value: FavoritesRoute.offer(id: offerID)) { label }
         } else {
             // Leave room where the chevron would be so bells line up.
-            label.padding(.trailing, 19)
+            label.padding(.trailing, chevronWidth)
         }
     }
 }

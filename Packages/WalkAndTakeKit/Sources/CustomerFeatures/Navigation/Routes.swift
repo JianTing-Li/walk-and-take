@@ -25,7 +25,7 @@ public enum ProfileRoute: Hashable, Sendable {
     case walkHistory
     /// Rewards ready to use and ones already used.
     case rewards
-    /// DEBUG developer tools; the app supplies these screens.
+    /// Developer mode tools.
     case timeTravel
     case seedMap
 }

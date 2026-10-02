@@ -28,9 +28,11 @@ public final class OrdersModel {
     }
 
     public private(set) var state: State = .loading
-    private var reservations: [Reservation] = []
-    private var now: Date
-    private let dependencies: CustomerDependencies
+    private(set) var reservations: [Reservation] = []
+    /// Miles each order's walk earned, for the past orders list.
+    private var walkedMiles: [UUID: Double] = [:]
+    private(set) var now: Date
+    let dependencies: CustomerDependencies
 
     public init(dependencies: CustomerDependencies) {
         self.dependencies = dependencies
@@ -38,6 +40,7 @@ public final class OrdersModel {
     }
 
     public var flags: FeatureFlags { dependencies.flags }
+    public var developer: DeveloperSettings { dependencies.developer }
     /// Impact card at the top (impact flag).
     public var showsImpact: Bool { flags.impact }
 
@@ -47,9 +50,12 @@ public final class OrdersModel {
     public func run() async {
         await load()
         let changes = dependencies.reservations.changes()
+        // A walk is credited just after its pickup, so its miles arrive a moment later.
+        let walkChanges = dependencies.walkRewards.changes()
         let clockChanges = dependencies.clock.changes()
         await withTaskGroup(of: Void.self) { group in
             group.addTask { for await _ in changes { await self.load() } }
+            group.addTask { for await _ in walkChanges { await self.load() } }
             group.addTask { for await _ in clockChanges { await self.load() } }
             group.addTask {
                 while !Task.isCancelled {
@@ -63,6 +69,11 @@ public final class OrdersModel {
     public func load() async {
         do {
             reservations = try await dependencies.reservations.reservations()
+            if flags.walkRewards, let walks = try? await dependencies.walkRewards.walks() {
+                walkedMiles = Dictionary(
+                    walks.filter { $0.creditedMiles > 0 }.map { ($0.reservationID, $0.creditedMiles) },
+                    uniquingKeysWith: { first, _ in first })
+            }
             now = dependencies.clock.now
             state = reservations.isEmpty ? .empty : .loaded
         } catch {
@@ -77,7 +88,7 @@ public final class OrdersModel {
 
     // MARK: - Output
 
-    private var active: [Reservation] {
+    var active: [Reservation] {
         reservations.filter { ReservationPolicy.isActive($0, at: now) }
     }
 
@@ -111,6 +122,6 @@ public final class OrdersModel {
     public var past: [OrderRowContent] {
         reservations
             .filter { !ReservationPolicy.isActive($0, at: now) }
-            .map { OrderRowContent($0, now: now, flags: flags) }
+            .map { OrderRowContent($0, now: now, flags: flags, walkedMiles: walkedMiles[$0.id]) }
     }
 }

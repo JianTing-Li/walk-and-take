@@ -33,7 +33,6 @@ struct PickupModelTests {
         let (model, _) = await pickup(Fixture.reservation(for: Self.tomorrow), at: Fixture.sep(24, 20, 30))
         #expect(model.header?.title == "Pickup opens tomorrow at 7:30 AM")
         #expect(model.header?.subtitle == "Your bag is held until 10:00 AM")
-        #expect(model.confirmFromText == "You can confirm pickup from tomorrow at 7:30 AM")
         #expect(model.code == "QW3E")
         #expect(model.pickupInstructions == "Ask at the counter.")
         #expect(model.summary.map(\.value)[1] == "Pick up tomorrow, Fri Sep 25, 7:30–10:00 AM")
@@ -90,7 +89,6 @@ struct PickupModelTests {
     @Test func missedAndCancelledHeaders() async {
         let (missed, _) = await pickup(Fixture.reservation(for: Self.breakfast), at: Fixture.sep(24, 10, 30))
         #expect(missed.header?.title == "Pickup window ended")
-        #expect(missed.confirmFromText == nil)
         let cancelled = Fixture.reservation(for: Self.breakfast, cancelledAt: Fixture.sep(24, 7))
         let (model, _) = await pickup(cancelled, at: Fixture.sep(24, 8))
         #expect(model.header?.title == "Order cancelled")
@@ -197,8 +195,9 @@ struct PickupWalkingTests {
             Issue.record("expected a walking section, got \(String(describing: model.walkSection))")
             return
         }
-        #expect(walking.title == "Walk in progress")
-        #expect(walking.detail == "Started at 7:00 AM. Swipe to confirm pickup when you arrive.")
+        // The scripted track already ends at the door, before the 7:30 window opens.
+        #expect(walking.phase == .arrivedEarly)
+        #expect(walking.title == "You've arrived")
         #expect(walking.warning == nil)
         #expect(try await harness.walkRewards.walk(reservationID: reservation.id) != nil)
     }
@@ -253,9 +252,11 @@ struct PickupWalkingTests {
         harness.walkTracker.script(Array(Self.track().prefix(3)))  // a third of the way
         await model.startWalk()
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.10 mi walked · 0.20 mi to go")
-        #expect(walking.countingText == "Counting +0.10 mi so far")
-        #expect(abs((walking.fraction ?? 0) - 1.0 / 3) < 0.02)
+        #expect(walking.phase == .walking)
+        #expect(walking.progressText == "0.1 mi walked · 0.2 mi to go")
+        #expect(abs(walking.fraction - 1.0 / 3) < 0.02)
+        #expect(walking.detail == "Started at 8:00 AM. Swipe to confirm pickup when you arrive.")
+        #expect(!walking.ticks.isEmpty)  // a tick every 0.1 mi
     }
 
     @Test func progressAdvancesAsFixesArrive() async throws {
@@ -265,15 +266,37 @@ struct PickupWalkingTests {
         harness.walkTracker.script(Array(Self.track().prefix(5)))
         await model.refreshLiveProgress()
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.20 mi walked · 0.10 mi to go")
+        #expect(walking.progressText == "0.2 mi walked · 0.1 mi to go")
     }
 
-    @Test func arrivingSaysYouAreAtTheDoor() async throws {
+    @Test func arrivingWhileOpenShrinksToOneLine() async throws {
         let (model, _, _) = await pickup(at: Fixture.sep(24, 8))
         await model.startWalk()  // the full track ends at the door
         let walking = try #require(walkingContent(model))
-        #expect(walking.progressText == "0.30 mi walked · You're at the door")
-        #expect((walking.fraction ?? 0) > 0.99)
+        #expect(walking.phase == .arrived)
+        #expect(walking.title == "0.3 mi walked · swipe below to confirm")
+        #expect(walking.detail == nil)
+        #expect(walking.fraction == 1)
+    }
+
+    @Test func arrivingBeforeTheWindowOpensSaysYouAreEarly() async throws {
+        // 7:00, window opens at 7:30; Start walk opened at 6:30.
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 7))
+        await model.startWalk()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.phase == .arrivedEarly)
+        #expect(walking.title == "You've arrived")
+        #expect(walking.detail == "You're here early. Pickup opens at 7:30 AM — your miles are saved.")
+        #expect(walking.progressText == "0.3 mi walked")
+    }
+
+    @Test func walkingBeforeTheWindowSaysWhenPickupOpens() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 7))
+        harness.walkTracker.script(Array(Self.track().prefix(3)))
+        await model.startWalk()
+        let walking = try #require(walkingContent(model))
+        #expect(walking.phase == .walking)
+        #expect(walking.detail == "Started at 7:00 AM. Pickup opens at 7:30 AM.")
     }
 
     @Test func waitsForAFirstLocation() async throws {
@@ -282,8 +305,17 @@ struct PickupWalkingTests {
         await model.startWalk()
         let walking = try #require(walkingContent(model))
         #expect(walking.progressText == "Waiting for your first location…")
-        #expect(walking.fraction == nil)
-        #expect(walking.countingText == nil)
+        #expect(walking.fraction == 0)  // the bar still shows, empty
+        #expect(walking.warning == nil)
+    }
+
+    @Test func aLongWaitForALocationSuggestsKeepingTheAppOpen() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.walkTracker.script([])
+        await model.startWalk()
+        for _ in 0..<PickupModel.noFixHintAfterPolls { await model.refreshLiveProgress() }
+        let walking = try #require(walkingContent(model))
+        #expect(walking.warning == "No location yet. Keep Walk & Take open while you walk.")
     }
 
     @Test func progressClearsOnceThePickupIsConfirmed() async {
@@ -294,6 +326,83 @@ struct PickupWalkingTests {
         #expect(model.liveProgress == nil)
     }
 
+    // MARK: Developer mode
+
+    @Test func noDemoControlsOutsideDeveloperMode() async {
+        let (model, _, _) = await pickup(at: Fixture.sep(24, 6))
+        #expect(model.demoWalkControls == nil)
+        #expect(!model.canOpenPickupNow)
+    }
+
+    @Test func developerModeCanStartAWalkBeforeTheUsualHour() async {
+        // 6:00: the window opens at 7:30, so the real Start walk button opens at 6:30.
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 6))
+        harness.developer.isOn = true
+        #expect(!model.canStartWalk)
+        #expect(model.demoWalkControls == .startNow)
+        await model.startWalkNow()
+        #expect(model.walk != nil)
+        #expect(harness.walkTracker.isTracking(reservation.id))
+    }
+
+    @Test func aSimulatedWalkOffersStepPauseAndArrive() async {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        harness.developer.isOn = true
+        harness.demo.simulatedWalks.insert(reservation.id)
+        harness.demo.autoWalking.insert(reservation.id)
+        harness.walkTracker.script(Array(Self.track().prefix(3)))
+        await model.startWalk()
+        #expect(model.demoWalkControls == .simulated(isAutoWalking: true, arrived: false))
+        await model.demoStep()
+        #expect(model.demoWalkControls == .simulated(isAutoWalking: false, arrived: false))
+        await model.demoToggleAutoWalk()
+        await model.demoArrive()
+        #expect(harness.demo.walkCalls == ["advance 0.1", "auto", "arrive"])
+    }
+
+    @Test func aGPSWalkCantBeDriven() async {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        harness.developer.isOn = true
+        await model.startWalk()
+        #expect(model.demoWalkControls == .live)
+    }
+
+    @Test func theOrderScreenSendsItsPickupReminder() async throws {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 8))
+        harness.developer.isOn = true
+        await model.demoSendReminder()
+        let sent = try #require(harness.notifications.sentReminders.first)
+        #expect(sent.reservationID == reservation.id)
+        #expect(sent.isOpen)
+    }
+
+    @Test func tappingStartWalkTwiceStartsOneWalk() async throws {
+        let (model, harness, _) = await pickup(at: Fixture.sep(24, 8))
+        async let first: Void = model.startWalk()
+        async let second: Void = model.startWalk()
+        _ = await (first, second)
+        #expect(try await harness.walkRewards.walks().count == 1)
+        #expect(!model.isStartingWalk)
+    }
+
+    @Test func confirmPickupNowOpensTheWindowAndCompletesThePickup() async {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
+        harness.developer.isOn = true
+        await model.demoConfirmPickup()
+        #expect(harness.clock.now == reservation.snapshot.pickupWindow.start)
+        #expect(model.status == .collected)
+    }
+
+    @Test func openPickupNowMovesTheClockToTheWindow() async {
+        let (model, harness, reservation) = await pickup(at: Fixture.sep(24, 7))
+        harness.developer.isOn = true
+        #expect(model.canOpenPickupNow)
+        model.openPickupNow()
+        #expect(harness.clock.now == reservation.snapshot.pickupWindow.start)
+        model.jumpToClosing()
+        #expect(harness.clock.now == reservation.snapshot.pickupWindow.end.addingTimeInterval(-300))
+    }
+
     // MARK: Miles earned
 
     @Test func aWalkedPickupShowsTheMilesEarnedWithTheFirstCatchphrase() async throws {
@@ -302,10 +411,10 @@ struct PickupWalkingTests {
         await model.startWalk()
         await model.collect()
         let card = try #require(model.walkEarned)
-        #expect(card.headline == "+0.30 mi earned")
+        #expect(card.headline == "+0.3 mi earned")
         #expect(card.catchphrase == "Walk&Take: every mile gets you something.")
-        #expect(card.contribution == "Walked pickup #1 · added 0.30 mi")
-        #expect(card.progress == "0.30 mi walked in total · 0.70 mi to your next reward")
+        #expect(card.contribution == "Walked pickup #1")
+        #expect(card.progress == "0.3 mi walked in total · 0.7 mi to your next reward")
         #expect(card.unlock == nil)
     }
 
@@ -316,8 +425,8 @@ struct PickupWalkingTests {
         await model.collect()
         let card = try #require(model.walkEarned)
         #expect(card.catchphrase == "Walk it. Earn it.")
-        #expect(card.contribution == "Walked pickup #2 · added 0.30 mi")
-        #expect(card.progress == "0.70 mi walked in total · 0.30 mi to your next reward")
+        #expect(card.contribution == "Walked pickup #2")
+        #expect(card.progress == "0.7 mi walked in total · 0.3 mi to your next reward")
     }
 
     @Test func reachingAMilestoneShowsTheUnlock() async throws {
@@ -327,7 +436,7 @@ struct PickupWalkingTests {
         await model.collect()
         let card = try #require(model.walkEarned)
         #expect(card.unlock == "Reward unlocked: 50% off one bag")
-        #expect(card.progress == "1.20 mi walked in total · 3.80 mi to your next reward")
+        #expect(card.progress == "1.2 mi walked in total · 3.8 mi to your next reward")
     }
 
     @Test func theSameCardShowsWhenTheOrderIsOpenedAgain() async throws {
@@ -371,8 +480,10 @@ struct PickupWalkingTests {
         #expect(walk.finishedAt != nil)
         #expect(walk.rejection == nil)
         #expect(abs(walk.creditedMiles - 0.3) < 0.02)
-        #expect(model.walkResultText == "+0.30 mi counted toward rewards")
-        #expect(model.summary.last?.label == "Walk")
+        #expect(model.walkResultText == "+0.3 mi counted toward rewards")
+        #expect(model.walkEarned != nil)
+        #expect(model.summary[1] == ("Picked up", "Thu Sep 24 at 8:00 AM"))
+        #expect(!model.summary.contains { $0.label == "Walk" })  // the earned card already says it
         #expect(!harness.walkTracker.isTracking(reservation.id))
         #expect(model.trackingStatus == .idle)
         #expect(abs(try await harness.walkRewards.totalMiles() - 0.3) < 0.02)
@@ -397,6 +508,7 @@ struct PickupWalkingTests {
         #expect(model.walk?.creditedMiles == 0)
         #expect(model.walk?.rejection == .simulatedLocation)
         #expect(model.walkResultText == WalkRejection.simulatedLocation.message)
+        #expect(model.summary.last?.label == "Walk")  // no earned card, so the row explains why
         #expect(try await harness.walkRewards.totalMiles() == 0)
     }
 
@@ -459,6 +571,41 @@ struct ManageOrderModelTests {
         return (model, harness)
     }
 
+    @Test func aLoadErrorOffersTryAgainInsteadOfNotFound() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        let reservation = harness.marketplace.add(Fixture.reservation(for: Self.offer))
+        harness.marketplace.failReads(true)
+        let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.state == .failed("Couldn't load this order. Please try again."))
+        harness.marketplace.failReads(false)
+        await model.retry()
+        #expect(model.state == .loaded)
+    }
+
+    @Test func theNewTotalKeepsTheRewardDiscount() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        var withReward = Fixture.reservation(for: Self.offer, rewardID: UUID())
+        withReward = Reservation(
+            id: withReward.id, confirmationCode: withReward.confirmationCode, quantity: 1,
+            snapshot: withReward.snapshot, reservedAt: withReward.reservedAt, rewardID: withReward.rewardID,
+            discount: Money(cents: 299))
+        let reservation = harness.marketplace.add(withReward)
+        let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.newTotal == Money(cents: 300))  // $5.99 − $2.99
+        model.quantity = 2
+        #expect(model.newTotal == Money(cents: 899))
+    }
+
+    @Test func cancellingAnOrderWithARewardSaysTheRewardComesBack() async {
+        let harness = Harness(now: Fixture.sep(24, 8), offers: [Self.offer])
+        let reservation = harness.marketplace.add(Fixture.reservation(for: Self.offer, rewardID: UUID()))
+        let model = ManageOrderModel(reservationID: reservation.id, dependencies: harness.dependencies)
+        await model.load()
+        #expect(model.cancelMessage.hasSuffix("Your walking reward goes back to your rewards."))
+    }
+
     @Test func limitsAndCopy() async {
         let (model, _) = await manage()  // 5 total, 1 simulated + 2 ours → 2 left
         #expect(model.quantity == 2)
@@ -466,8 +613,8 @@ struct ManageOrderModelTests {
         #expect(!model.canSave)
         #expect(model.quantityFooter == "You can hold up to 3 bags. Near Café has 1 more available.")
         #expect(model.deadlineNotice.title == "Free changes until 9:50 AM")
-        #expect(model.deadlineNotice.detail == "10 minutes before pickup ends")
-        #expect(model.pickupText == "Today · until 10:00 AM")
+        #expect(model.deadlineNotice.detail == "Changes close 10 min before pickup ends.")
+        #expect(model.pickupText == "Today · 7:30–10:00 AM")
     }
 
     @Test func minutesLeftUnderAnHour() async {

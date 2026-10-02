@@ -22,6 +22,11 @@ struct RateOrderView: View {
                 case .loading: LoadingView()
                 case .notFound:
                     EmptyStateView("Order not found", systemImage: "bag", message: "It may have been removed.")
+                case .failed(let message):
+                    EmptyStateView(
+                        "Something went wrong", systemImage: "exclamationmark.triangle", message: message,
+                        actionTitle: "Try again"
+                    ) { Task { await model.load() } }
                 case .rating: form
                 case .submitted: thanks
                 }

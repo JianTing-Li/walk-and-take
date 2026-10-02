@@ -60,7 +60,7 @@ public struct WalkRewardCard: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(Spacing.l)
         .background(Color.yolk.opacity(0.2), in: RoundedRectangle(cornerRadius: Radius.panel))
         .accessibilityElement(children: .combine)
     }

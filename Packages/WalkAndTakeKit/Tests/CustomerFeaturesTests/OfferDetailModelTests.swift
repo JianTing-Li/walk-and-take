@@ -212,6 +212,15 @@ struct OfferDetailModelTests {
         return setup
     }
 
+    @Test func thePriceRowFollowsTheRewardSwitch() async {
+        let model = await detailWithReward().model
+        #expect(model.displayPrice == model.price)
+        #expect(model.priceNote == "You save \(model.savingsPercent)%")
+        model.reserve.useReward = true
+        #expect(model.displayPrice == Money(cents: 300))  // $5.99 − $2.99
+        #expect(model.priceNote.hasPrefix("With your reward · you save "))
+    }
+
     @Test func noToggleWithoutABankedReward() async {
         let setup = await detail()
         #expect(!setup.model.reserve.showsRewardToggle)
@@ -228,11 +237,6 @@ struct OfferDetailModelTests {
         #expect(model.rewardLine == "50% off one bag: −$2.99")
         model.reserve.quantity = 2
         #expect(model.reserveButtonTitle == "Reserve · $8.99")  // 2 x $5.99 - $2.99
-    }
-
-    @Test func theReviewLineShowsTheWalkAndMilesBeforeConfirming() async {
-        let model = await detail().model
-        #expect(model.walkReviewLine == "0.2 mi walk · +0.2 mi toward a reward")
     }
 
     @Test func reservingWithARewardUsesItUp() async throws {
@@ -278,7 +282,19 @@ struct OfferDetailModelTests {
     @Test func rewardsStayOffWhenTheFlagIsOff() async {
         let setup = await detailWithReward(flags: Fixture.flags(walkRewards: false))
         #expect(!setup.model.reserve.showsRewardToggle)
-        #expect(setup.model.walkReviewLine == nil)
+    }
+
+    // MARK: Developer mode
+
+    @Test func theDemoMenuJumpsToTheBagsPickupWindow() async throws {
+        // 7:00, before today's 7:30–10:00 window.
+        let setup = await detail(Self.todayID, at: Fixture.sep(24, 7))
+        let window = try #require(setup.model.offer?.pickupWindow)
+        #expect(setup.model.demoCanJumpToPickup)
+        setup.model.demoJumpToPickup()
+        #expect(setup.harness.clock.now == window.start)
+        setup.model.demoJumpToClosing()
+        #expect(setup.harness.clock.now == window.end.addingTimeInterval(-300))
     }
 
     // MARK: Effect on progress
@@ -307,18 +323,7 @@ struct OfferDetailModelTests {
         #expect(card.outcome == "After this pickup: 0.2 of 1 mi · 0.8 mi to go")
     }
 
-    // MARK: Walk-to-qualify reminder
-
-    @Test func theReserveBarRemindsYouThatMilesNeedAWalk() async {
-        let model = await detail().model
-        #expect(model.walkReminderLine == "Miles count only if you walk to pickup and tap Start walk on your order.")
-    }
-
-    @Test func noReminderWhenTheBagCannotBeReservedOrTheFlagIsOff() async {
-        #expect(await detail(flags: Fixture.flags(walkRewards: false)).model.walkReminderLine == nil)
-        // 10:30 is after the 10:00 window, so the bag can't be reserved.
-        #expect(await detail(Self.todayID, at: Fixture.sep(24, 10, 30)).model.walkReminderLine == nil)
-    }
+    // MARK: Walk-to-qualify reminder (confirmation sheet)
 
     @Test func theConfirmationExplainsWhenStartWalkOpens() async throws {
         // At 8:00 the window (7:30) is already open, so Start walk is open now.

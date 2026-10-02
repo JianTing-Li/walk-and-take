@@ -6,6 +6,7 @@
 import DesignSystem
 import Domain
 import MapKit
+import Platform
 import SwiftUI
 
 public struct OfferDetailView: View {
@@ -30,7 +31,13 @@ public struct OfferDetailView: View {
                     actionTitle: "Try again"
                 ) { Task { await model.load() } }
             case .loaded:
-                content.safeAreaInset(edge: .bottom) { reserveBar(reserve) }
+                content
+                    .overlay(alignment: .bottomTrailing) {
+                        if model.developer.usesDemoControls {
+                            DemoMenuButton(title: "Demo · this bag", actions: demoActions).padding(Spacing.l)
+                        }
+                    }
+                    .safeAreaInset(edge: .bottom) { reserveBar(reserve) }
             }
         }
         .navigationTitle(model.restaurantName)
@@ -43,6 +50,7 @@ public struct OfferDetailView: View {
                     Image(systemName: model.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(model.isFavorite ? .red : .primary)
                 }
+                .sensoryFeedback(.selection, trigger: model.isFavorite)
                 .accessibilityLabel(model.isFavorite ? "Remove from favorites" : "Add to favorites")
             }
         }
@@ -64,10 +72,12 @@ public struct OfferDetailView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
-                CategoryGradient(category: model.category, symbolSize: 64)
-                    .frame(height: 180)
+                CategoryGradient(category: model.category, symbolSize: 48)
+                    .frame(height: 120)
                     .overlay(alignment: .bottomLeading) {
-                        StatusBadge(text: model.badgeText, isUrgent: model.isUrgent).padding(Spacing.m)
+                        if let badge = model.heroBadgeText {
+                            StatusBadge(text: badge, isUrgent: model.isUrgent).padding(Spacing.m)
+                        }
                     }
 
                 VStack(alignment: .leading, spacing: Spacing.xl) {
@@ -87,7 +97,7 @@ public struct OfferDetailView: View {
                             LocationPreview(name: model.restaurantName, coordinate: coordinate)
                         }
                     }
-                    .padding(14)
+                    .padding(Spacing.l)
                     .background(
                         Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.panel))
 
@@ -120,7 +130,7 @@ public struct OfferDetailView: View {
                     }
                 }
             }
-            Text("It's a surprise! Contents depend on what's left at the end of the morning.")
+            Text("It's a surprise! Contents depend on what the store has left.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
@@ -131,33 +141,39 @@ public struct OfferDetailView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Price").font(.headline)
-                Text("You save \(model.savingsPercent)%").font(.footnote).foregroundStyle(.secondary)
+                Text(model.priceNote).font(.footnote).foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
             }
             Spacer()
-            PriceStack(price: model.price, estimatedValue: model.estimatedValue, size: .title2)
+            PriceStack(price: model.displayPrice, estimatedValue: model.estimatedValue, size: .title2)
+                .animation(.default, value: model.displayPrice)
         }
+    }
+
+    /// Developer mode: jump the clock to this bag's pickup window.
+    private var demoActions: [DemoAction] {
+        var actions: [DemoAction] = []
+        if model.demoCanJumpToPickup {
+            actions.append(
+                DemoAction("Jump to pickup time", systemImage: "clock.badge.checkmark") { model.demoJumpToPickup() })
+        }
+        if model.demoCanJumpToClosing {
+            actions.append(
+                DemoAction("Jump to 5 min before pickup ends", systemImage: "hourglass.bottomhalf.filled") {
+                    model.demoJumpToClosing()
+                })
+        }
+        return actions
     }
 
     private func reserveBar(_ reserve: ReserveModel) -> some View {
         VStack(spacing: Spacing.s) {
-            if let walkReviewLine = model.walkReviewLine {
-                Label(walkReviewLine, systemImage: "figure.walk")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color.splashTeal)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if let reminder = model.walkReminderLine {
-                Text(reminder)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("offerDetail.walkReminder")
-            }
             if model.canReserve, reserve.showsRewardToggle {
                 Toggle(isOn: Bindable(reserve).useReward) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Use my walking reward").font(.subheadline.weight(.semibold))
-                        Text(model.rewardLine ?? "50% off one bag").font(.footnote).foregroundStyle(.secondary)
+                        Text(model.rewardLine ?? "\(WalkRewardLadder.discountPercent)% off one bag").font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .tint(.splashTeal)
@@ -173,11 +189,22 @@ public struct OfferDetailView: View {
             Button {
                 Task { await reserve.reserve() }
             } label: {
-                Text(model.reserveButtonTitle)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+                Group {
+                    if reserve.isReserving {
+                        HStack(spacing: Spacing.xs) {
+                            ProgressView().tint(.white)
+                            Text("Reserving…")
+                        }
+                    } else {
+                        Text(model.reserveButtonTitle)
+                    }
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
             }
+            .sensoryFeedback(.success, trigger: reserve.confirmation != nil) { _, confirmed in confirmed }
             .buttonStyle(.borderedProminent)
             .tint(.splashTeal)
             .disabled(!model.canReserve || reserve.isReserving)

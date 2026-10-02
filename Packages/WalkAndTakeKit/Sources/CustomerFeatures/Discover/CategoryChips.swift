@@ -13,7 +13,7 @@ struct CategoryChips: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.xs) {
                 chip("All", symbol: "square.grid.2x2.fill", selected: selection == nil) { selection = nil }
                 ForEach(FoodCategory.allCases) { category in
                     chip(category.label, symbol: category.symbol, selected: selection == category) {
@@ -22,6 +22,10 @@ struct CategoryChips: View {
                 }
             }
         }
+        // Chips scroll to the screen's edges but line up with the content when at rest.
+        .contentMargins(.horizontal, Spacing.l, for: .scrollContent)
+        .padding(.horizontal, -Spacing.l)
+        .sensoryFeedback(.selection, trigger: selection)
     }
 
     private func chip(_ title: String, symbol: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -29,7 +33,7 @@ struct CategoryChips: View {
             Label(title, systemImage: symbol)
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(selected ? Color.splashTeal : Color(.secondarySystemGroupedBackground), in: Capsule())
                 .foregroundStyle(selected ? .white : .primary)
         }

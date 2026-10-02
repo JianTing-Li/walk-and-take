@@ -67,7 +67,7 @@ struct MapBrowseView: View {
                     ForEach(MapBrowseModel.Day.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, 72)
+                .frame(maxWidth: 240)  // centered, clear of the corner buttons
                 .padding(.top, Spacing.xs)
             }
         }
@@ -107,7 +107,7 @@ struct MapBrowseView: View {
 
     private var legend: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(model.availableCount) bags within \(model.maxDistanceText) mi · tap a pin")
+            Text("^[\(model.availableCount) bag](inflect: true) within \(model.maxDistanceText) mi · tap a pin")
                 .font(.subheadline.weight(.semibold))
             HStack(spacing: 14) {
                 legendDot(.splashTeal, "Available now")
@@ -118,7 +118,7 @@ struct MapBrowseView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(14)
+        .padding(Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card))
     }
