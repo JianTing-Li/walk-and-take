@@ -41,6 +41,14 @@ public actor SwitchingWalkTracker: WalkTracking {
         await tracker(for: reservationID).finish(reservationID: reservationID)
     }
 
+    public func recover(reservationID: UUID) async -> [WalkSample] {
+        await live.recover(reservationID: reservationID)
+    }
+
+    public func discard(reservationID: UUID) async {
+        await live.discard(reservationID: reservationID)
+    }
+
     private func tracker(for reservationID: UUID) async -> any WalkTracking {
         await demo.isTracking(reservationID) ? demo : live
     }

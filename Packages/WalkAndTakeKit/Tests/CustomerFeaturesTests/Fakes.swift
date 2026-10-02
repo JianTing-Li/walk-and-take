@@ -71,6 +71,9 @@ nonisolated final class FakeWalkTracker: WalkTracking, Sendable {
         var locationOff = false
         var script: [WalkSample] = []
         var destinations: [UUID: Coordinate] = [:]
+        /// Fixes "saved on disk" by a tracker that was running before the app was killed.
+        var saved: [UUID: [WalkSample]] = [:]
+        var discarded: Set<UUID> = []
     }
 
     private let state = Mutex(State())
@@ -80,6 +83,10 @@ nonisolated final class FakeWalkTracker: WalkTracking, Sendable {
     func setLocationOff(_ off: Bool) { state.withLock { $0.locationOff = off } }
     func isTracking(_ id: UUID) -> Bool { state.withLock { $0.active.contains(id) } }
     func destination(of id: UUID) -> Coordinate? { state.withLock { $0.destinations[id] } }
+    /// Pretends these fixes were saved before the app was killed.
+    func saveFixes(_ samples: [WalkSample], for id: UUID) { state.withLock { $0.saved[id] = samples } }
+    func hasSavedFixes(for id: UUID) -> Bool { state.withLock { $0.saved[id]?.isEmpty == false } }
+    func wasDiscarded(_ id: UUID) -> Bool { state.withLock { $0.discarded.contains(id) } }
 
     func begin(reservationID: UUID, destination: Coordinate) async {
         state.withLock {
@@ -97,6 +104,15 @@ nonisolated final class FakeWalkTracker: WalkTracking, Sendable {
         state.withLock { s in
             guard s.active.remove(reservationID) != nil else { return [] }
             return s.script
+        }
+    }
+    func recover(reservationID: UUID) async -> [WalkSample] {
+        state.withLock { $0.saved[reservationID] ?? [] }
+    }
+    func discard(reservationID: UUID) async {
+        state.withLock { s in
+            s.saved[reservationID] = nil
+            s.discarded.insert(reservationID)
         }
     }
 }
@@ -177,6 +193,14 @@ nonisolated final class FakeWalkRewards: WalkRewardsRepository, Sendable {
     }
 
     func redeemReward(id: UUID, reservationID: UUID, at now: Date) async throws -> Reward {
+        try claim(id, reservationID: reservationID, at: now)
+    }
+
+    func releaseReward(reservationID: UUID) async throws { release(reservationID: reservationID) }
+
+    /// Spends a reward the way the real reservation store does: in the same step as the reservation.
+    @discardableResult
+    func claim(_ id: UUID, reservationID: UUID, at now: Date) throws -> Reward {
         let reward = try state.withLock { s -> Reward in
             guard let index = s.rewards.firstIndex(where: { $0.id == id }) else {
                 throw WalkRewardsError.rewardNotFound
@@ -207,7 +231,8 @@ nonisolated final class FakeWalkRewards: WalkRewardsRepository, Sendable {
         broadcaster.send(.walkRewardsChanged)
     }
 
-    func releaseReward(reservationID: UUID) async throws {
+    /// Gives back a reward a cancelled reservation had used.
+    func release(reservationID: UUID) {
         state.withLock { s in
             for i in s.rewards.indices where s.rewards[i].redeemedReservationID == reservationID {
                 s.rewards[i].redeemedAt = nil
@@ -374,7 +399,7 @@ struct Harness {
         location: ResolvedLocation = ResolvedLocation(coordinate: Fixture.licCenter, source: .device),
         flags: FeatureFlags = Fixture.flags()
     ) {
-        marketplace = FakeMarketplace(offers: offers)
+        marketplace = FakeMarketplace(offers: offers, rewards: walkRewards)
         userData = FakeUserData(preferences: preferences, favorites: favorites)
         clock = AdjustableClock(fixedAt: now)
         resetter = FakeResetter(marketplace: marketplace, userData: userData, walkRewards: walkRewards)

@@ -181,9 +181,16 @@ struct ReservationStoreTests {
     // MARK: Walking reward
 
     @Test func aRewardTakesHalfOffOneBagAndKeepsTheReservationID() async throws {
-        let market = try await stores().marketplace
+        let s = try await stores()
+        let market = s.marketplace
+        // A real, banked reward: a credited 1.5 mi walk crosses the 1 mi milestone.
+        let walkID = UUID()
+        _ = try await s.userData.startWalk(reservationID: walkID, restaurantID: "rst", at: TestEnv.sep(24, 7))
+        let earned = try await s.userData.finishWalk(
+            reservationID: walkID, verdict: .credited(miles: 1.5), at: TestEnv.sep(24, 7),
+            calendar: NYCalendar.calendar)
+        let rewardID = try #require(earned.newRewards.first).id
         let id = UUID()
-        let rewardID = UUID()
         let r = try await market.reserve(
             offerID: earlyBird, quantity: 2, reservationID: id, rewardID: rewardID, at: TestEnv.sep(24, 7))
         #expect(r.id == id)

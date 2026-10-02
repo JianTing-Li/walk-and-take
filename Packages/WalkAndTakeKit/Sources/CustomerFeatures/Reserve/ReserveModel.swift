@@ -100,23 +100,11 @@ public final class ReserveModel {
         isReserving = true
         defer { isReserving = false }
         let now = dependencies.clock.now
-        let reservationID = UUID()
-        var rewardID: UUID?
-        if useReward, let reward = availableReward {
-            // Claim the reward first so it can only ever back one reservation.
-            do {
-                _ = try await dependencies.walkRewards.redeemReward(
-                    id: reward.id, reservationID: reservationID, at: now)
-                rewardID = reward.id
-            } catch {
-                await refreshRewards()
-                alert = .rewardUnavailable
-                return
-            }
-        }
+        // The store spends the reward in the same save as the reservation, so the two succeed or fail together.
+        let rewardID = useReward ? availableReward?.id : nil
         do {
             let reservation = try await dependencies.reservations.reserve(
-                offerID: offerID, quantity: quantity, reservationID: reservationID, rewardID: rewardID, at: now)
+                offerID: offerID, quantity: quantity, reservationID: UUID(), rewardID: rewardID, at: now)
             quantity = 1
             useReward = false
             // Count what's left after this one before telling the customer.
@@ -125,14 +113,17 @@ public final class ReserveModel {
                 reservation: reservation, now: now, showsChangePolicy: dependencies.flags.manageOrder,
                 showsWalkReminder: dependencies.flags.walkRewards, rewardsLeft: availableRewardCount)
         } catch let error as ReservationError {
-            alert = error == .notVisibleYet ? .notOpenYet : .noLongerAvailable
+            switch error {
+            case .notVisibleYet:
+                alert = .notOpenYet
+            case .rewardUnavailable:
+                await refreshRewards()
+                alert = .rewardUnavailable
+            default:
+                alert = .noLongerAvailable
+            }
         } catch {
             alert = .failed
-        }
-        if rewardID != nil {
-            // If the reservation failed, hand the reward back.
-            if confirmation == nil { try? await dependencies.walkRewards.releaseReward(reservationID: reservationID) }
-            await refreshRewards()
         }
     }
 }

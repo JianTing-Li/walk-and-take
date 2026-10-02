@@ -131,3 +131,39 @@ extension UserDataStore {
         .contains { $0.finishedAt.map { calendar.isDate($0, inSameDayAs: day) } ?? false }
     }
 }
+
+// MARK: - Saved GPS fixes
+
+extension UserDataStore {
+    /// Fixes saved here change nothing on screen, so this saves without announcing a change.
+    public func appendSamples(_ samples: [WalkSample], reservationID: UUID) throws {
+        guard !samples.isEmpty else { return }
+        for sample in samples { modelContext.insert(WalkSampleEntity(sample, reservationID: reservationID)) }
+        try saveQuietly()
+    }
+
+    public func savedSamples(reservationID: UUID) throws -> [WalkSample] {
+        try modelContext.fetch(
+            FetchDescriptor<WalkSampleEntity>(
+                predicate: #Predicate { $0.reservationID == reservationID },
+                sortBy: [SortDescriptor(\.timestamp)])
+        ).map(\.domain)
+    }
+
+    public func discardSamples(reservationID: UUID) throws {
+        let rows = try modelContext.fetch(
+            FetchDescriptor<WalkSampleEntity>(predicate: #Predicate { $0.reservationID == reservationID }))
+        guard !rows.isEmpty else { return }
+        rows.forEach(modelContext.delete)
+        try saveQuietly()
+    }
+
+    private func saveQuietly() throws {
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+}

@@ -16,6 +16,7 @@ public enum ModelContainerFactory {
         PreferencesEntity.self,
         CommuteProfileEntity.self,
         WalkEntity.self,
+        WalkSampleEntity.self,
         RewardEntity.self,
         MetadataEntity.self,
     ])

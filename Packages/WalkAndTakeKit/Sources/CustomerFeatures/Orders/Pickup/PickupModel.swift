@@ -42,6 +42,7 @@ public final class PickupModel {
     public private(set) var earnings: WalkEarnings?
     /// A walk is being started; Start walk can't be tapped again meanwhile.
     public private(set) var isStartingWalk = false
+    private var isCompletingWalk = false
     /// Developer mode: this walk is simulated, and whether it's walking on its own.
     public private(set) var walkIsSimulated = false
     public private(set) var isAutoWalking = false
@@ -126,7 +127,11 @@ public final class PickupModel {
                 _ = await dependencies.walkTracker.finish(reservationID: reservationID)
                 tracking = .idle
             }
-        case .collected, nil:
+            if walk != nil { await dependencies.walkTracker.discard(reservationID: reservationID) }
+        case .collected:
+            // Confirmed, but the app died before the walk was credited: finish it from the saved fixes.
+            if let walk, walk.finishedAt == nil { await completeWalk() }
+        case nil:
             break
         }
         trackingStatus = tracking
@@ -201,8 +206,15 @@ public final class PickupModel {
     /// After a confirmed pickup: stop recording, check the track, and credit the miles.
     /// A failed check still leaves the pickup done; it just earns no miles.
     private func completeWalk() async {
-        guard flags.walkRewards, let walk, walk.finishedAt == nil, let snapshot = reservation?.snapshot else { return }
-        let samples = await dependencies.walkTracker.finish(reservationID: reservationID)
+        guard flags.walkRewards, let walk, walk.finishedAt == nil, let snapshot = reservation?.snapshot,
+            !isCompletingWalk
+        else { return }
+        // The swipe and a screen reload can both get here; only one may credit the walk.
+        isCompletingWalk = true
+        defer { isCompletingWalk = false }
+        var samples = await dependencies.walkTracker.finish(reservationID: reservationID)
+        // No live recording means the app was killed mid-walk: read back the fixes it had saved.
+        if samples.isEmpty { samples = await dependencies.walkTracker.recover(reservationID: reservationID) }
         trackingStatus = .idle
         liveProgress = nil
         let verdict = WalkVerifier.verify(samples: samples, destination: snapshot.coordinate)
@@ -212,6 +224,8 @@ public final class PickupModel {
                 reservationID: reservationID, verdict: verdict, at: dependencies.clock.now, calendar: .current)
             walkCompletion = completion
             self.walk = completion.walk
+            // Credited, so the saved fixes have done their job. (If crediting failed they stay for a retry.)
+            await dependencies.walkTracker.discard(reservationID: reservationID)
         } catch {
             self.walk = try? await dependencies.walkRewards.walk(reservationID: reservationID)
         }
